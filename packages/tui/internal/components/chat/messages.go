@@ -1,9 +1,9 @@
-package chat
 
 import (
 	"context"
 	"fmt"
 	"log/slog"
+	"slices"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea/v2"
@@ -250,6 +250,13 @@ func (m *messagesComponent) renderView() tea.Cmd {
 		reverted := false
 		revertedMessageCount := 0
 		revertedToolCount := 0
+		lastAssistantMessage := "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz"
+		for _, msg := range slices.Backward(m.app.Messages) {
+			if assistant, ok := msg.Info.(opencode.AssistantMessage); ok {
+				lastAssistantMessage = assistant.ID
+				break
+			}
+		}
 		for _, message := range m.app.Messages {
 			var content string
 			var cached bool
@@ -312,14 +319,18 @@ func (m *messagesComponent) renderView() tea.Cmd {
 							flexItems...,
 						)
 
-						key := m.cache.GenerateKey(casted.ID, part.Text, width, files)
+						author := m.app.Config.Username
+						if casted.ID > lastAssistantMessage {
+							author += " [queued]"
+						}
+						key := m.cache.GenerateKey(casted.ID, part.Text, width, files, author)
 						content, cached = m.cache.Get(key)
 						if !cached {
 							content = renderText(
 								m.app,
 								message.Info,
 								part.Text,
-								m.app.Config.Username,
+								author,
 								m.showToolDetails,
 								width,
 								files,
@@ -583,7 +594,7 @@ func (m *messagesComponent) renderView() tea.Cmd {
 
 					prefix := ansi.Cut(line, 0, left)
 					middle := strings.TrimRight(ansi.Strip(ansi.Cut(line, left, right)), " ")
-					suffix := ansi.Cut(line, left+len(middle), width)
+					suffix := ansi.Cut(line, left+ansi.StringWidth(middle), width)
 					clipboard = append(clipboard, middle)
 					line = prefix + styles.NewStyle().
 						Background(t.Accent()).

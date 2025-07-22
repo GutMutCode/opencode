@@ -123,9 +123,14 @@ resources:
       revert: post /session/{id}/revert
       unrevert: post /session/{id}/unrevert
 
+  tui:
+    methods:
+      appendPrompt: post /tui/append-prompt
+      openHelp: post /tui/open-help
+
 settings:
   disable_mock_tests: true
-  license: Apache-2.0
+  license: MIT
 
 security:
   - {}
