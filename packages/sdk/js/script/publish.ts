@@ -17,8 +17,8 @@ const snapshot = process.env["OPENCODE_SNAPSHOT"] === "true"
 await $`bun pm version --allow-same-version --no-git-tag-version ${version}`
 if (snapshot) {
   await $`bun publish --tag snapshot`
-  await $`git checkout package.json`
 }
 if (!snapshot) {
   await $`bun publish`
 }
+await $`bun pm version 0.0.0 --no-git-tag-version`
