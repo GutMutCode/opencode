@@ -611,10 +611,12 @@ export namespace Server {
               description: "Created message",
               content: {
                 "application/json": {
-                  schema: resolver(z.object({
+                  schema: resolver(
+                    z.object({
                       info: MessageV2.Assistant,
                       parts: MessageV2.Part.array(),
-                    })),
+                    }),
+                  ),
                 },
               },
             },
@@ -630,6 +632,8 @@ export namespace Server {
         async (c) => {
           const sessionID = c.req.valid("param").id
           const body = c.req.valid("json")
+          if (body.parts.length === 1 && body.parts[0].type === "text" && body.parts[0].text.startsWith("/")) {
+          }
           const msg = await Session.chat({ ...body, sessionID })
           return c.json(msg)
         },

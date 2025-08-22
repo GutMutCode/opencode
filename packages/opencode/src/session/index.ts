@@ -47,6 +47,7 @@ import { Permission } from "../permission"
 import { Wildcard } from "../util/wildcard"
 import { ulid } from "ulid"
 import { defer } from "../util/defer"
+import { Command } from "../command"
 
 export namespace Session {
   const log = Log.create({ service: "session" })
@@ -1025,13 +1026,13 @@ export namespace Session {
     return result
   }
 
-  export const CommandInput = z.object({
+  export const ShellInput = z.object({
     sessionID: Identifier.schema("session"),
     agent: z.string(),
     command: z.string(),
   })
-  export type CommandInput = z.infer<typeof CommandInput>
-  export async function shell(input: CommandInput) {
+  export type ShellInput = z.infer<typeof ShellInput>
+  export async function shell(input: ShellInput) {
     using abort = lock(input.sessionID)
     const msg: MessageV2.Assistant = {
       id: Identifier.ascending("message"),
@@ -1153,6 +1154,36 @@ export namespace Session {
       await updatePart(part)
     }
     return { info: msg, parts: [part] }
+  }
+
+  export const CommandInput = z.object({
+    messageID: Identifier.schema("message").optional(),
+    sessionID: Identifier.schema("session"),
+    agent: z.string().optional(),
+    model: z.string().optional(),
+    command: z.string(),
+  })
+  export type CommandInput = z.infer<typeof CommandInput>
+  export async function command(input: CommandInput) {
+    const command = await Command.get(input.command)
+    const agent = input.agent ?? command.agent ?? "build"
+    const model =
+      input.model ??
+      command.model ??
+      (await Agent.get(agent).then((x) => (x.model ? `${x.model.providerID}/${x.model.modelID}` : undefined))) ??
+      (await Provider.defaultModel().then((x) => `${x.providerID}/${x.modelID}`))
+    return chat({
+      sessionID: input.sessionID,
+      ...Provider.parseModel(model!),
+      agent,
+      parts: [
+        {
+          type: "text",
+          text: command.template,
+        },
+      ],
+      messageID: input.messageID,
+    })
   }
 
   function createProcessor(assistantMsg: MessageV2.Assistant, model: ModelsDev.Model) {

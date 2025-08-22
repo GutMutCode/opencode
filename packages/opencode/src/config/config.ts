@@ -192,6 +192,14 @@ export namespace Config {
   export const Permission = z.union([z.literal("ask"), z.literal("allow"), z.literal("deny")])
   export type Permission = z.infer<typeof Permission>
 
+  export const Command = z.object({
+    template: z.string(),
+    description: z.string().optional(),
+    agent: z.string().optional(),
+    model: z.string().optional(),
+  })
+  export type Command = z.infer<typeof Command>
+
   export const Agent = z
     .object({
       model: z.string().optional(),
@@ -305,6 +313,7 @@ export namespace Config {
       theme: z.string().optional().describe("Theme name to use for the interface"),
       keybinds: Keybinds.optional().describe("Custom keybind configurations"),
       tui: TUI.optional().describe("TUI specific settings"),
+      command: z.record(z.string(), Command).optional(),
       plugin: z.string().array().optional(),
       snapshot: z.boolean().optional(),
       share: z
