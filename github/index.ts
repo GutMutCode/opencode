@@ -1,148 +1,37 @@
 import { $ } from "bun"
 import path from "node:path"
-import { Octokit } from "@octokit/rest"
-import { graphql } from "@octokit/graphql"
 import * as core from "@actions/core"
-import * as github from "@actions/github"
-import type { Context as GitHubContext } from "@actions/github/lib/context"
 import type { IssueCommentEvent } from "@octokit/webhooks-types"
 import { createOpencodeClient } from "@opencode-ai/sdk"
 import { spawn } from "node:child_process"
-
-type GitHubAuthor = {
-  login: string
-  name?: string
-}
-
-type GitHubComment = {
-  id: string
-  databaseId: string
-  body: string
-  author: GitHubAuthor
-  createdAt: string
-}
-
-type GitHubReviewComment = GitHubComment & {
-  path: string
-  line: number | null
-}
-
-type GitHubCommit = {
-  oid: string
-  message: string
-  author: {
-    name: string
-    email: string
-  }
-}
-
-type GitHubFile = {
-  path: string
-  additions: number
-  deletions: number
-  changeType: string
-}
-
-type GitHubReview = {
-  id: string
-  databaseId: string
-  author: GitHubAuthor
-  body: string
-  state: string
-  submittedAt: string
-  comments: {
-    nodes: GitHubReviewComment[]
-  }
-}
-
-type GitHubPullRequest = {
-  title: string
-  body: string
-  author: GitHubAuthor
-  baseRefName: string
-  headRefName: string
-  headRefOid: string
-  createdAt: string
-  additions: number
-  deletions: number
-  state: string
-  baseRepository: {
-    nameWithOwner: string
-  }
-  headRepository: {
-    nameWithOwner: string
-  }
-  commits: {
-    totalCount: number
-    nodes: Array<{
-      commit: GitHubCommit
-    }>
-  }
-  files: {
-    nodes: GitHubFile[]
-  }
-  comments: {
-    nodes: GitHubComment[]
-  }
-  reviews: {
-    nodes: GitHubReview[]
-  }
-}
-
-type GitHubIssue = {
-  title: string
-  body: string
-  author: GitHubAuthor
-  createdAt: string
-  state: string
-  comments: {
-    nodes: GitHubComment[]
-  }
-}
-
-type PullRequestQueryResponse = {
-  repository: {
-    pullRequest: GitHubPullRequest
-  }
-}
-
-type IssueQueryResponse = {
-  repository: {
-    issue: GitHubIssue
-  }
-}
+import type { GitHubIssue, GitHubPullRequest, IssueQueryResponse, PullRequestQueryResponse } from "./src/types"
+import { Context } from "./src/context"
+import { Mock } from "./src/mock"
+import { Auth } from "./src/auth"
+import { Git } from "./src/git"
+import { GitHub } from "./src/github"
 
 const { client, server } = createOpencode()
-let accessToken: string
-let octoRest: Octokit
-let octoGraph: typeof graphql
 let commentId: number
-let gitConfig: string
 let session: { id: string; title: string; version: string }
 let shareId: string | undefined
 let exitCode = 0
 type PromptFiles = Awaited<ReturnType<typeof getUserPrompt>>["promptFiles"]
 
 try {
-  assertContextEvent("issue_comment")
+  Context.assertEventName("issue_comment")
   assertPayloadKeyword()
   await assertOpencodeConnected()
 
-  accessToken = await getAccessToken()
-  octoRest = new Octokit({ auth: accessToken })
-  octoGraph = graphql.defaults({
-    headers: { authorization: `token ${accessToken}` },
-  })
-
   const { userPrompt, promptFiles } = await getUserPrompt()
-  await configureGit(accessToken)
+  await Git.configure()
   await assertPermissions()
 
   const comment = await createComment()
   commentId = comment.data.id
 
   // Setup opencode session
-  const repoData = await fetchRepo()
+  const repoData = await GitHub.repoData()
   session = await client.session.create<true>().then((r) => r.data)
   await subscribeSessionEvents()
   shareId = await (async () => {
@@ -219,8 +108,8 @@ try {
   //core.setOutput("prepare_error", e.message);
 } finally {
   server.close()
-  await restoreGitConfig()
-  await revokeAppToken()
+  await Git.restore()
+  await Auth.revoke()
 }
 process.exit(exitCode)
 
@@ -238,7 +127,7 @@ function createOpencode() {
 }
 
 function assertPayloadKeyword() {
-  const payload = useContext().payload as IssueCommentEvent
+  const payload = Context.payload<IssueCommentEvent>()
   const body = payload.comment.body.trim()
   if (!body.match(/(?:^|\s)(?:\/opencode|\/oc)(?=$|\s)/)) {
     throw new Error("Comments must mention `/opencode` or `/oc`")
@@ -262,14 +151,6 @@ async function assertOpencodeConnected() {
   }
 }
 
-function assertContextEvent(...events: string[]) {
-  const context = useContext()
-  if (!events.includes(context.eventName)) {
-    throw new Error(`Unsupported event type: ${context.eventName}`)
-  }
-  return context
-}
-
 function useEnvModel() {
   const value = process.env["MODEL"]
   if (!value) throw new Error(`Environment variable "MODEL" is not set`)
@@ -282,15 +163,6 @@ function useEnvModel() {
   return { providerID, modelID }
 }
 
-function useEnvRunUrl() {
-  const { repo } = useContext()
-
-  const runId = process.env["GITHUB_RUN_ID"]
-  if (!runId) throw new Error(`Environment variable "GITHUB_RUN_ID" is not set`)
-
-  return `/${repo.owner}/${repo.repo}/actions/runs/${runId}`
-}
-
 function useEnvShare() {
   const value = process.env["SHARE"]
   if (!value) return undefined
@@ -299,90 +171,36 @@ function useEnvShare() {
   throw new Error(`Invalid share value: ${value}. Share must be a boolean.`)
 }
 
-function useEnvMock() {
-  return {
-    mockEvent: process.env["MOCK_EVENT"],
-    mockToken: process.env["MOCK_TOKEN"],
-  }
-}
-
 function useEnvGithubToken() {
   return process.env["TOKEN"]
 }
 
-function isMock() {
-  const { mockEvent, mockToken } = useEnvMock()
-  return Boolean(mockEvent || mockToken)
-}
-
 function isPullRequest() {
-  const context = useContext()
-  const payload = context.payload as IssueCommentEvent
-  return Boolean(payload.issue.pull_request)
-}
-
-function useContext() {
-  return isMock() ? (JSON.parse(useEnvMock().mockEvent!) as GitHubContext) : github.context
+  return Boolean(Context.payload<IssueCommentEvent>().issue.pull_request)
 }
 
 function useIssueId() {
-  const payload = useContext().payload as IssueCommentEvent
-  return payload.issue.number
+  return Context.payload<IssueCommentEvent>().issue.number
 }
 
 function useShareUrl() {
-  return isMock() ? "https://dev.opencode.ai" : "https://opencode.ai"
-}
-
-async function getAccessToken() {
-  const { repo } = useContext()
-
-  const envToken = useEnvGithubToken()
-  if (envToken) return envToken
-
-  let response
-  if (isMock()) {
-    response = await fetch("https://api.opencode.ai/exchange_github_app_token_with_pat", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${useEnvMock().mockToken}`,
-      },
-      body: JSON.stringify({ owner: repo.owner, repo: repo.repo }),
-    })
-  } else {
-    const oidcToken = await core.getIDToken("opencode-github-action")
-    response = await fetch("https://api.opencode.ai/exchange_github_app_token", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${oidcToken}`,
-      },
-    })
-  }
-
-  if (!response.ok) {
-    const responseJson = (await response.json()) as { error?: string }
-    throw new Error(`App token exchange failed: ${response.status} ${response.statusText} - ${responseJson.error}`)
-  }
-
-  const responseJson = (await response.json()) as { token: string }
-  return responseJson.token
+  return Mock.isMock() ? "https://dev.opencode.ai" : "https://opencode.ai"
 }
 
 async function createComment() {
-  const { repo } = useContext()
   console.log("Creating comment...")
-  return await octoRest.rest.issues.createComment({
-    owner: repo.owner,
-    repo: repo.repo,
+  const rest = await GitHub.rest()
+  return await rest.issues.createComment({
+    owner: Context.repo().owner,
+    repo: Context.repo().repo,
     issue_number: useIssueId(),
-    body: `[Working...](${useEnvRunUrl()})`,
+    body: `[Working...](${GitHub.runUrl()})`,
   })
 }
 
 async function getUserPrompt() {
   let prompt = (() => {
-    const payload = useContext().payload as IssueCommentEvent
-    const body = payload.comment.body.trim()
+    const body = Context.payload<IssueCommentEvent>().comment.body.trim()
     if (body === "/opencode" || body === "/oc") return "Summarize this thread"
     if (body.includes("/opencode") || body.includes("/oc")) return body
     throw new Error("Comments must mention `/opencode` or `/oc`")
@@ -419,7 +237,7 @@ async function getUserPrompt() {
     // Download image
     const res = await fetch(url, {
       headers: {
-        Authorization: `Bearer ${accessToken}`,
+        Authorization: `Bearer ${await Auth.token()}`,
         Accept: "application/vnd.github.v3+json",
       },
     })
@@ -530,11 +348,10 @@ async function subscribeSessionEvents() {
 }
 
 async function summarize(response: string) {
-  const payload = useContext().payload as IssueCommentEvent
   try {
     return await chat(`Summarize the following in less than 40 characters:\n\n${response}`)
   } catch (e) {
-    return `Fix issue: ${payload.issue.title}`
+    return `Fix issue: ${Context.payload<IssueCommentEvent>().issue.title}`
   }
 }
 
@@ -581,30 +398,6 @@ async function chat(text: string, files: PromptFiles = []) {
   return match.text
 }
 
-async function configureGit(appToken: string) {
-  // Do not change git config when running locally
-  if (isMock()) return
-
-  console.log("Configuring git...")
-  const config = "http.https://github.com/.extraheader"
-  const ret = await $`git config --local --get ${config}`
-  gitConfig = ret.stdout.toString().trim()
-
-  const newCredentials = Buffer.from(`x-access-token:${appToken}`, "utf8").toString("base64")
-
-  await $`git config --local --unset-all ${config}`
-  await $`git config --local ${config} "AUTHORIZATION: basic ${newCredentials}"`
-  await $`git config --global user.name "opencode-agent[bot]"`
-  await $`git config --global user.email "opencode-agent[bot]@users.noreply.github.com"`
-}
-
-async function restoreGitConfig() {
-  if (gitConfig === undefined) return
-  console.log("Restoring git config...")
-  const config = "http.https://github.com/.extraheader"
-  await $`git config --local ${config} "${gitConfig}"`
-}
-
 async function checkoutNewBranch() {
   console.log("Checking out new branch...")
   const branch = generateBranchName("issue")
@@ -646,36 +439,33 @@ function generateBranchName(type: "issue" | "pr") {
 
 async function pushToNewBranch(summary: string, branch: string) {
   console.log("Pushing to new branch...")
-  const actor = useContext().actor
 
   await $`git add .`
   await $`git commit -m "${summary}
 
-Co-authored-by: ${actor} <${actor}@users.noreply.github.com>"`
+Co-authored-by: ${Context.actor()} <${Context.actor()}@users.noreply.github.com>"`
   await $`git push -u origin ${branch}`
 }
 
 async function pushToLocalBranch(summary: string) {
   console.log("Pushing to local branch...")
-  const actor = useContext().actor
 
   await $`git add .`
   await $`git commit -m "${summary}
 
-Co-authored-by: ${actor} <${actor}@users.noreply.github.com>"`
+Co-authored-by: ${Context.actor()} <${Context.actor()}@users.noreply.github.com>"`
   await $`git push`
 }
 
 async function pushToForkBranch(summary: string, pr: GitHubPullRequest) {
   console.log("Pushing to fork branch...")
-  const actor = useContext().actor
 
   const remoteBranch = pr.headRefName
 
   await $`git add .`
   await $`git commit -m "${summary}
 
-Co-authored-by: ${actor} <${actor}@users.noreply.github.com>"`
+Co-authored-by: ${Context.actor()} <${Context.actor()}@users.noreply.github.com>"`
   await $`git push fork HEAD:${remoteBranch}`
 }
 
@@ -686,9 +476,7 @@ async function branchIsDirty() {
 }
 
 async function assertPermissions() {
-  const { actor, repo } = useContext()
-
-  console.log(`Asserting permissions for user ${actor}...`)
+  console.log(`Asserting permissions for user ${Context.actor()}...`)
 
   if (useEnvGithubToken()) {
     console.log("  skipped (using github token)")
@@ -697,20 +485,22 @@ async function assertPermissions() {
 
   let permission
   try {
-    const response = await octoRest.repos.getCollaboratorPermissionLevel({
-      owner: repo.owner,
-      repo: repo.repo,
-      username: actor,
+    const rest = await GitHub.rest()
+    const response = await rest.repos.getCollaboratorPermissionLevel({
+      owner: Context.repo().owner,
+      repo: Context.repo().repo,
+      username: Context.actor(),
     })
 
     permission = response.data.permission
     console.log(`  permission: ${permission}`)
   } catch (error) {
     console.error(`Failed to check permissions: ${error}`)
-    throw new Error(`Failed to check permissions for user ${actor}: ${error}`)
+    throw new Error(`Failed to check permissions for user ${Context.actor()}: ${error}`)
   }
 
-  if (!["admin", "write"].includes(permission)) throw new Error(`User ${actor} does not have write permissions`)
+  if (!["admin", "write"].includes(permission))
+    throw new Error(`User ${Context.actor()} does not have write permissions`)
 }
 
 async function updateComment(body: string) {
@@ -718,10 +508,10 @@ async function updateComment(body: string) {
 
   console.log("Updating comment...")
 
-  const { repo } = useContext()
-  return await octoRest.rest.issues.updateComment({
-    owner: repo.owner,
-    repo: repo.repo,
+  const rest = await GitHub.rest()
+  return await rest.issues.updateComment({
+    owner: Context.repo().owner,
+    repo: Context.repo().repo,
     comment_id: commentId,
     body,
   })
@@ -729,10 +519,10 @@ async function updateComment(body: string) {
 
 async function createPR(base: string, branch: string, title: string, body: string) {
   console.log("Creating pull request...")
-  const { repo } = useContext()
-  const pr = await octoRest.rest.pulls.create({
-    owner: repo.owner,
-    repo: repo.repo,
+  const rest = await GitHub.rest()
+  const pr = await rest.pulls.create({
+    owner: Context.repo().owner,
+    repo: Context.repo().repo,
     head: branch,
     base,
     title,
@@ -754,18 +544,13 @@ function footer(opts?: { image?: boolean }) {
     return `<a href="${useShareUrl()}/s/${shareId}"><img width="200" alt="${titleAlt}" src="https://social-cards.sst.dev/opencode-share/${title64}.png?model=${providerID}/${modelID}&version=${session.version}&id=${shareId}" /></a>\n`
   })()
   const shareUrl = shareId ? `[opencode session](${useShareUrl()}/s/${shareId})&nbsp;&nbsp;|&nbsp;&nbsp;` : ""
-  return `\n\n${image}${shareUrl}[github run](${useEnvRunUrl()})`
-}
-
-async function fetchRepo() {
-  const { repo } = useContext()
-  return await octoRest.rest.repos.get({ owner: repo.owner, repo: repo.repo })
+  return `\n\n${image}${shareUrl}[github run](${GitHub.runUrl()})`
 }
 
 async function fetchIssue() {
   console.log("Fetching prompt data for issue...")
-  const { repo } = useContext()
-  const issueResult = await octoGraph<IssueQueryResponse>(
+  const graph = await GitHub.graph()
+  const issueResult = await graph<IssueQueryResponse>(
     `
 query($owner: String!, $repo: String!, $number: Int!) {
   repository(owner: $owner, name: $repo) {
@@ -792,8 +577,8 @@ query($owner: String!, $repo: String!, $number: Int!) {
   }
 }`,
     {
-      owner: repo.owner,
-      repo: repo.repo,
+      owner: Context.repo().owner,
+      repo: Context.repo().repo,
       number: useIssueId(),
     },
   )
@@ -805,12 +590,10 @@ query($owner: String!, $repo: String!, $number: Int!) {
 }
 
 function buildPromptDataForIssue(issue: GitHubIssue) {
-  const payload = useContext().payload as IssueCommentEvent
-
   const comments = (issue.comments?.nodes || [])
     .filter((c) => {
       const id = parseInt(c.databaseId)
-      return id !== commentId && id !== payload.comment.id
+      return id !== commentId && id !== Context.payload<IssueCommentEvent>().comment.id
     })
     .map((c) => `  - ${c.author.login} at ${c.createdAt}: ${c.body}`)
 
@@ -829,8 +612,8 @@ function buildPromptDataForIssue(issue: GitHubIssue) {
 
 async function fetchPR() {
   console.log("Fetching prompt data for PR...")
-  const { repo } = useContext()
-  const prResult = await octoGraph<PullRequestQueryResponse>(
+  const graph = await GitHub.graph()
+  const prResult = await graph<PullRequestQueryResponse>(
     `
 query($owner: String!, $repo: String!, $number: Int!) {
   repository(owner: $owner, name: $repo) {
@@ -914,8 +697,8 @@ query($owner: String!, $repo: String!, $number: Int!) {
   }
 }`,
     {
-      owner: repo.owner,
-      repo: repo.repo,
+      owner: Context.repo().owner,
+      repo: Context.repo().repo,
       number: useIssueId(),
     },
   )
@@ -927,12 +710,10 @@ query($owner: String!, $repo: String!, $number: Int!) {
 }
 
 function buildPromptDataForPR(pr: GitHubPullRequest) {
-  const payload = useContext().payload as IssueCommentEvent
-
   const comments = (pr.comments?.nodes || [])
     .filter((c) => {
       const id = parseInt(c.databaseId)
-      return id !== commentId && id !== payload.comment.id
+      return id !== commentId && id !== Context.payload<IssueCommentEvent>().comment.id
     })
     .map((c) => `- ${c.author.login} at ${c.createdAt}: ${c.body}`)
 
@@ -965,18 +746,4 @@ function buildPromptDataForPR(pr: GitHubPullRequest) {
     ...(reviewData.length > 0 ? ["<pull_request_reviews>", ...reviewData, "</pull_request_reviews>"] : []),
     "</pull_request>",
   ].join("\n")
-}
-
-async function revokeAppToken() {
-  if (!accessToken) return
-  console.log("Revoking app token...")
-
-  await fetch("https://api.github.com/installation/token", {
-    method: "DELETE",
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      Accept: "application/vnd.github+json",
-      "X-GitHub-Api-Version": "2022-11-28",
-    },
-  })
 }
