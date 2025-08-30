@@ -84,6 +84,18 @@ export namespace Log {
   }
 
   let last = Date.now()
+
+  function stringifyErr(error: Error): string {
+    let result = error.message
+    if (error.stack) {
+      result += "\n" + error.stack
+    }
+    if (error.cause && error.cause instanceof Error) {
+      result += "\nCaused by: " + stringifyErr(error.cause)
+    }
+    return result
+  }
+
   export function create(tags?: Record<string, any>) {
     tags = tags || {}
 
@@ -103,8 +115,8 @@ export namespace Log {
         .filter(([_, value]) => value !== undefined && value !== null)
         .map(([key, value]) => {
           const prefix = `${key}=`
-          if (value instanceof Error) return prefix + value.message
-          if (typeof value === "object") return prefix + JSON.stringify(value)
+          if (value instanceof Error) return prefix + stringifyErr(value)
+          if (typeof value === "object") return prefix + JSON.stringify(value, null, 2)
           return prefix + value
         })
         .join(" ")
