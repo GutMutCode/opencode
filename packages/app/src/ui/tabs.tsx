@@ -19,7 +19,7 @@ function TabsList(props: TabsListProps) {
         "relative flex items-center bg-background overflow-x-auto no-scrollbar": true,
         "divide-x divide-border-subtle/40": true,
         "after:content-[''] after:block after:grow after:h-9": true,
-        "after:border-l first:after:border-l-0! after:border-b after:border-border-subtle/40": true,
+        "after:border-l empty:after:border-l-0! after:border-b after:border-border-subtle/40": true,
         [local.class ?? ""]: !!local.class,
       }}
       {...others}
