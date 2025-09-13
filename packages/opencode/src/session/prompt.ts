@@ -18,6 +18,7 @@ import {
   wrapLanguageModel,
   type StreamTextResult,
   LoadAPIKeyError,
+  stepCountIs,
 } from "ai"
 import { SessionCompaction } from "./compaction"
 import { Instance } from "../project/instance"
@@ -28,7 +29,7 @@ import { Plugin } from "../plugin"
 
 import PROMPT_PLAN from "../session/prompt/plan.txt"
 import BUILD_SWITCH from "../session/prompt/build-switch.txt"
-import type { ModelsDev } from "../provider/models"
+import { ModelsDev } from "../provider/models"
 import { defer } from "../util/defer"
 import { mergeDeep, pipe } from "remeda"
 import { ToolRegistry } from "../tool/registry"
@@ -140,15 +141,8 @@ export namespace SessionPrompt {
     const session = await Session.get(input.sessionID)
     await SessionRevert.cleanup(session)
 
-    const userMsg = await resolveUserMessage(input)
-
-    await Session.updateMessage(userMsg.info)
-    for (const part of userMsg.parts) {
-      await Session.updatePart(part)
-    }
-    // mark session as updated
-    // used for session list sorting (indicates when session was most recently interacted with)
-    await Session.update(input.sessionID, (_draft) => {})
+    const userMsg = await createUserMessage(input)
+    await Session.touch(input.sessionID)
 
     if (isBusy(input.sessionID)) {
       return new Promise((resolve) => {
@@ -163,76 +157,25 @@ export namespace SessionPrompt {
         state().queued.set(input.sessionID, queue)
       })
     }
-
     const agent = await Agent.get(input.agent ?? "build")
-
-    // get model
-    const model = await (async () => {
-      if (input.model) {
-        return input.model
-      }
-      if (agent.model) {
-        return agent.model
-      }
-      return Provider.defaultModel()
-    })().then((x) => Provider.getModel(x.providerID, x.modelID))
-
-    let msgs = await Session.messages(input.sessionID).then(MessageV2.filterSummarized)
-    const lastAssistant = msgs.findLast((msg) => msg.info.role === "assistant")
-    if (
-      lastAssistant?.info.role === "assistant" &&
-      SessionCompaction.isOverflow({
-        tokens: lastAssistant.info.tokens,
-        model: model.info,
-      })
-    ) {
-      const msg = await SessionCompaction.run({
-        sessionID: input.sessionID,
-        providerID: model.providerID,
-        modelID: model.info.id,
-      })
-      msgs = [msg]
-    }
-
+    const model = await resolveModel({
+      agent,
+      model: input.model,
+    }).then((x) => Provider.getModel(x.providerID, x.modelID))
     const outputLimit = Math.min(model.info.limit.output, OUTPUT_TOKEN_MAX) || OUTPUT_TOKEN_MAX
-
     using abort = lock(input.sessionID)
 
-    const isFirst =
-      msgs.filter((m) => m.info.role === "user" && !m.parts.every((p) => "synthetic" in p && p.synthetic)).length === 1
-    if (isFirst && !session.parentID) {
-      generateTitle({
-        session,
-        message: userMsg,
-        providerID: model.providerID,
-        modelID: model.info.id,
-      })
-    }
+    /*
+    ensureTitle({
+      session,
+      history: msgs,
+      message: userMsg,
+      providerID: model.providerID,
+      modelID: model.info.id,
+    })
+    */
 
-    if (agent.name === "plan") {
-      msgs.at(-1)?.parts.push({
-        id: Identifier.ascending("part"),
-        messageID: userMsg.info.id,
-        sessionID: input.sessionID,
-        type: "text",
-        text: PROMPT_PLAN,
-        synthetic: true,
-      })
-    }
-
-    const wasPlan = msgs.some((msg) => msg.info.role === "assistant" && msg.info.mode === "plan")
-    if (wasPlan && agent.name === "build") {
-      msgs.at(-1)?.parts.push({
-        id: Identifier.ascending("part"),
-        messageID: userMsg.info.id,
-        sessionID: input.sessionID,
-        type: "text",
-        text: BUILD_SWITCH,
-        synthetic: true,
-      })
-    }
-
-    const system = await resolveSystem({
+    const system = await resolveSystemPrompt({
       providerID: model.providerID,
       modelID: model.info.id,
       agent,
@@ -282,140 +225,180 @@ export namespace SessionPrompt {
     )
 
     let pointer = 0
-    const stream = streamText({
-      async prepareStep({ messages, steps }) {
-        const step = steps.at(-1)
-        if (
-          step &&
-          SessionCompaction.isOverflow({
-            tokens: Session.getUsage(model.info, step.usage, step.providerMetadata).tokens,
-            model: model.info,
-          }) &&
-          false
-        ) {
-          await processor.end()
-          const msg = await SessionCompaction.run({
-            sessionID: input.sessionID,
-            providerID: model.providerID,
-            modelID: model.info.id,
-          })
-          await processor.next()
-          pointer = messages.length
-          messages.push(...MessageV2.toModelMessage([msg]))
-        }
-
-        // Add queued messages to the stream
-        const queue = (state().queued.get(input.sessionID) ?? []).filter((x) => !x.processed)
-        if (queue.length) {
-          await processor.end()
-          for (const item of queue) {
-            if (item.processed) continue
-            messages.push(
-              ...MessageV2.toModelMessage([
-                {
-                  info: item.message,
-                  parts: item.parts,
-                },
-              ]),
-            )
-            item.processed = true
+    while (true) {
+      const msgs: MessageV2.WithParts[] = pipe(
+        await getMessages({
+          sessionID: input.sessionID,
+          model: model.info,
+          providerID: model.providerID,
+        }),
+        (messages) => insertReminders({ messages, agent }),
+      )
+      const stream = streamText({
+        async prepareStep({ messages, steps }) {
+          const step = steps.at(-1)
+          if (
+            step &&
+            SessionCompaction.isOverflow({
+              tokens: Session.getUsage(model.info, step.usage, step.providerMetadata).tokens,
+              model: model.info,
+            }) &&
+            false
+          ) {
+            await processor.end()
+            const msg = await SessionCompaction.run({
+              sessionID: input.sessionID,
+              providerID: model.providerID,
+              modelID: model.info.id,
+            })
+            await processor.next()
+            pointer = messages.length
+            messages.push(...MessageV2.toModelMessage([msg]))
           }
-          await processor.next()
-        }
-        return {
-          messages: messages.slice(pointer),
-        }
-      },
-      async experimental_repairToolCall(input) {
-        const lower = input.toolCall.toolName.toLowerCase()
-        if (lower !== input.toolCall.toolName && tools[lower]) {
-          log.info("repairing tool call", {
-            tool: input.toolCall.toolName,
-            repaired: lower,
-          })
+
+          // Add queued messages to the stream
+          const queue = (state().queued.get(input.sessionID) ?? []).filter((x) => !x.processed)
+          if (queue.length) {
+            await processor.end()
+            for (const item of queue) {
+              if (item.processed) continue
+              messages.push(
+                ...MessageV2.toModelMessage([
+                  {
+                    info: item.message,
+                    parts: item.parts,
+                  },
+                ]),
+              )
+              item.processed = true
+            }
+            await processor.next()
+          }
+          return {
+            messages: messages.slice(pointer),
+          }
+        },
+        async experimental_repairToolCall(input) {
+          const lower = input.toolCall.toolName.toLowerCase()
+          if (lower !== input.toolCall.toolName && tools[lower]) {
+            log.info("repairing tool call", {
+              tool: input.toolCall.toolName,
+              repaired: lower,
+            })
+            return {
+              ...input.toolCall,
+              toolName: lower,
+            }
+          }
           return {
             ...input.toolCall,
-            toolName: lower,
+            input: JSON.stringify({
+              tool: input.toolCall.toolName,
+              error: input.error.message,
+            }),
+            toolName: "invalid",
           }
-        }
-        return {
-          ...input.toolCall,
-          input: JSON.stringify({
-            tool: input.toolCall.toolName,
-            error: input.error.message,
-          }),
-          toolName: "invalid",
-        }
-      },
-      headers:
-        model.providerID === "opencode"
-          ? {
-              "x-opencode-session": input.sessionID,
-              "x-opencode-request": userMsg.info.id,
-            }
-          : undefined,
-      maxRetries: 10,
-      activeTools: Object.keys(tools).filter((x) => x !== "invalid"),
-      maxOutputTokens: ProviderTransform.maxOutputTokens(model.providerID, outputLimit, params.options),
-      abortSignal: abort.signal,
-      stopWhen: async ({ steps }) => {
-        if (steps.length >= 1000) {
-          return true
-        }
-
-        // Check if processor flagged that we should stop
-        if (processor.getShouldStop()) {
-          return true
-        }
-
-        return false
-      },
-      providerOptions: {
-        [model.providerID]: params.options,
-      },
-      temperature: params.temperature,
-      topP: params.topP,
-      messages: [
-        ...system.map(
-          (x): ModelMessage => ({
-            role: "system",
-            content: x,
-          }),
-        ),
-        ...MessageV2.toModelMessage(msgs.filter((m) => !(m.info.role === "assistant" && m.info.error))),
-      ],
-      tools: model.info.tool_call === false ? undefined : tools,
-      model: wrapLanguageModel({
-        model: model.language,
-        middleware: [
-          {
-            async transformParams(args) {
-              if (args.type === "stream") {
-                // @ts-expect-error
-                args.params.prompt = ProviderTransform.message(args.params.prompt, model.providerID, model.modelID)
+        },
+        headers:
+          model.providerID === "opencode"
+            ? {
+                "x-opencode-session": input.sessionID,
+                "x-opencode-request": userMsg.info.id,
               }
-              return args.params
-            },
-          },
+            : undefined,
+        maxRetries: 10,
+        activeTools: Object.keys(tools).filter((x) => x !== "invalid"),
+        maxOutputTokens: ProviderTransform.maxOutputTokens(model.providerID, outputLimit, params.options),
+        abortSignal: abort.signal,
+        providerOptions: {
+          [model.providerID]: params.options,
+        },
+        stopWhen: stepCountIs(1),
+        temperature: params.temperature,
+        topP: params.topP,
+        messages: [
+          ...system.map(
+            (x): ModelMessage => ({
+              role: "system",
+              content: x,
+            }),
+          ),
+          ...MessageV2.toModelMessage(msgs.filter((m) => !(m.info.role === "assistant" && m.info.error))),
         ],
-      }),
-    })
-    const result = await processor.process(stream)
-    const queued = state().queued.get(input.sessionID) ?? []
-    const unprocessed = queued.find((x) => !x.processed)
-    if (unprocessed) {
-      unprocessed.processed = true
-      return prompt(unprocessed.input)
+        tools: model.info.tool_call === false ? undefined : tools,
+        model: wrapLanguageModel({
+          model: model.language,
+          middleware: [
+            {
+              async transformParams(args) {
+                if (args.type === "stream") {
+                  // @ts-expect-error
+                  args.params.prompt = ProviderTransform.message(args.params.prompt, model.providerID, model.modelID)
+                }
+                return args.params
+              },
+            },
+          ],
+        }),
+      })
+      const result = await processor.process(stream)
+      await processor.end()
+      if ((await stream.finishReason) === "tool-calls") {
+        await processor.next()
+        continue
+      }
+
+      const queued = state().queued.get(input.sessionID) ?? []
+      const unprocessed = queued.find((x) => !x.processed)
+      if (unprocessed) {
+        unprocessed.processed = true
+        continue
+      }
+      for (const item of queued) {
+        item.callback(result)
+      }
+      state().queued.delete(input.sessionID)
+      // Session.prune(input)
+      return result
     }
-    for (const item of queued) {
-      item.callback(result)
-    }
-    state().queued.delete(input.sessionID)
-    // Session.prune(input)
-    return result
   }
 
-  async function resolveSystem(input: { system?: string; agent: Agent.Info; providerID: string; modelID: string }) {
+  async function getMessages(input: { sessionID: string; model: ModelsDev.Model; providerID: string }) {
+    let msgs = await Session.messages(input.sessionID).then(MessageV2.filterSummarized)
+    const lastAssistant = msgs.findLast((msg) => msg.info.role === "assistant")
+    if (
+      lastAssistant?.info.role === "assistant" &&
+      SessionCompaction.isOverflow({
+        tokens: lastAssistant.info.tokens,
+        model: input.model,
+      })
+    ) {
+      const msg = await SessionCompaction.run({
+        sessionID: input.sessionID,
+        providerID: input.providerID,
+        modelID: input.model.id,
+      })
+      msgs = [msg]
+    }
+    return msgs
+  }
+
+  async function resolveModel(input: { model: PromptInput["model"]; agent: Agent.Info }) {
+    if (input.model) {
+      return input.model
+    }
+    if (input.agent.model) {
+      return input.agent.model
+    }
+    return Provider.defaultModel()
+  }
+
+  async function resolveSystemPrompt(input: {
+    system?: string
+    agent: Agent.Info
+    providerID: string
+    modelID: string
+  }) {
     let system = SystemPrompt.header(input.providerID)
     system.push(
       ...(() => {
@@ -554,7 +537,7 @@ export namespace SessionPrompt {
     return tools
   }
 
-  async function resolveUserMessage(input: PromptInput) {
+  async function createUserMessage(input: PromptInput) {
     const info: MessageV2.Info = {
       id: input.messageID ?? Identifier.ascending("message"),
       role: "user",
@@ -768,10 +751,43 @@ export namespace SessionPrompt {
         ]
       }),
     ).then((x) => x.flat())
+
+    await Session.updateMessage(info)
+    for (const part of parts) {
+      await Session.updatePart(part)
+    }
+
     return {
       info,
       parts,
     }
+  }
+
+  function insertReminders(input: { messages: MessageV2.WithParts[]; agent: Agent.Info }) {
+    const userMessage = input.messages.findLast((msg) => msg.info.role === "user")
+    if (!userMessage) return input.messages
+    if (input.agent.name === "plan") {
+      userMessage.parts.push({
+        id: Identifier.ascending("part"),
+        messageID: userMessage.info.id,
+        sessionID: userMessage.info.sessionID,
+        type: "text",
+        text: PROMPT_PLAN,
+        synthetic: true,
+      })
+    }
+    const wasPlan = input.messages.some((msg) => msg.info.role === "assistant" && msg.info.mode === "plan")
+    if (wasPlan && input.agent.name === "build") {
+      userMessage.parts.push({
+        id: Identifier.ascending("part"),
+        messageID: userMessage.info.id,
+        sessionID: userMessage.info.sessionID,
+        type: "text",
+        text: BUILD_SWITCH,
+        synthetic: true,
+      })
+    }
+    return input.messages
   }
 
   export type Processor = Awaited<ReturnType<typeof createProcessor>>
@@ -1421,12 +1437,18 @@ export namespace SessionPrompt {
     })
   }
 
-  async function generateTitle(input: {
+  async function ensureTitle(input: {
     session: Session.Info
     message: MessageV2.WithParts
+    history: MessageV2.WithParts[]
     providerID: string
     modelID: string
   }) {
+    if (input.session.parentID) return
+    const isFirst =
+      input.history.filter((m) => m.info.role === "user" && !m.parts.every((p) => "synthetic" in p && p.synthetic))
+        .length === 1
+    if (!isFirst) return
     const small =
       (await Provider.getSmallModel(input.providerID)) ?? (await Provider.getModel(input.providerID, input.modelID))
     const options = {

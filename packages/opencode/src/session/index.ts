@@ -101,6 +101,12 @@ export namespace Session {
     })
   }
 
+  export async function touch(sessionID: string) {
+    await update(sessionID, (draft) => {
+      draft.time.updated = Date.now()
+    })
+  }
+
   export async function createNext(input: { id?: string; title?: string; parentID?: string; directory: string }) {
     const result: Info = {
       id: Identifier.descending("session", input.id),
