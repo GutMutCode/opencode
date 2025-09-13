@@ -139,7 +139,9 @@ export namespace SessionPrompt {
 
     const session = await Session.get(input.sessionID)
     await SessionRevert.cleanup(session)
+
     const userMsg = await resolveUserMessage(input)
+
     await Session.updateMessage(userMsg.info)
     for (const part of userMsg.parts) {
       await Session.updatePart(part)
@@ -163,6 +165,8 @@ export namespace SessionPrompt {
     }
 
     const agent = await Agent.get(input.agent ?? "build")
+
+    // get model
     const model = await (async () => {
       if (input.model) {
         return input.model
@@ -174,7 +178,6 @@ export namespace SessionPrompt {
     })().then((x) => Provider.getModel(x.providerID, x.modelID))
 
     let msgs = await Session.messages(input.sessionID).then(MessageV2.filterSummarized)
-
     const lastAssistant = msgs.findLast((msg) => msg.info.role === "assistant")
     if (
       lastAssistant?.info.role === "assistant" &&
@@ -280,11 +283,6 @@ export namespace SessionPrompt {
 
     let pointer = 0
     const stream = streamText({
-      onError(e) {
-        log.error("streamText error", {
-          error: e,
-        })
-      },
       async prepareStep({ messages, steps }) {
         const step = steps.at(-1)
         if (
@@ -356,7 +354,7 @@ export namespace SessionPrompt {
               "x-opencode-request": userMsg.info.id,
             }
           : undefined,
-      maxRetries: 3,
+      maxRetries: 10,
       activeTools: Object.keys(tools).filter((x) => x !== "invalid"),
       maxOutputTokens: ProviderTransform.maxOutputTokens(model.providerID, outputLimit, params.options),
       abortSignal: abort.signal,

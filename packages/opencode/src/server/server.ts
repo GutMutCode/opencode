@@ -668,14 +668,7 @@ export namespace Server {
             description: "List of messages",
             content: {
               "application/json": {
-                schema: resolver(
-                  z
-                    .object({
-                      info: MessageV2.Info,
-                      parts: MessageV2.Part.array(),
-                    })
-                    .array(),
-                ),
+                schema: resolver(MessageV2.WithParts.array()),
               },
             },
           },

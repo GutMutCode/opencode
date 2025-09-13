@@ -331,10 +331,11 @@ export namespace MessageV2 {
     ),
   }
 
-  export type WithParts = {
-    info: Info
-    parts: Part[]
-  }
+  export const WithParts = z.object({
+    info: Info,
+    parts: z.array(Part),
+  })
+  export type WithParts = z.infer<typeof WithParts>
 
   export function fromV1(v1: Message.Info) {
     if (v1.role === "assistant") {
