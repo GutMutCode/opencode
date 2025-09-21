@@ -127,11 +127,19 @@ export namespace LSP {
         continue
       }
       log.info("spawning lsp server", { serverID: server.id })
-      const handle = await server.spawn(root).catch((err) => {
-        s.broken.add(root + server.id)
-        log.error(`Failed to spawn LSP server ${server.id}`, { error: err })
-        return undefined
-      })
+      const handle = await server
+        .spawn(root)
+        .then((h) => {
+          if (h === undefined) {
+            s.broken.add(root + server.id)
+          }
+          return h
+        })
+        .catch((err) => {
+          s.broken.add(root + server.id)
+          log.error(`Failed to spawn LSP server ${server.id}`, { error: err })
+          return undefined
+        })
       if (!handle) continue
       const client = await LSPClient.create({
         serverID: server.id,
