@@ -7,9 +7,12 @@ import pkg from "../package.json"
 
 const snapshot = process.env["OPENCODE_SNAPSHOT"] === "true"
 let version = process.env["OPENCODE_VERSION"]
-if (!version && snapshot) version = `0.0.0-${new Date().toISOString().slice(0, 16).replace(/[-:T]/g, "")}`
+if (!version && snapshot) {
+  version = `0.0.0-${new Date().toISOString().slice(0, 16).replace(/[-:T]/g, "")}`
+  process.env["OPENCODE_VERSION"] = version
+}
 if (!version) throw new Error("OPENCODE_VERSION is required")
-const npmTag = snapshot ? "snapshot" : "latest"
+const tag = process.env["OPENCODE_TAG"] ?? (snapshot ? "snapshot" : "latest")
 
 console.log(`publishing ${version}`)
 
@@ -43,9 +46,9 @@ await Bun.file(`./dist/${pkg.name}/package.json`).write(
   ),
 )
 for (const [name] of Object.entries(binaries)) {
-  await $`cd dist/${name} && chmod 777 -R . && bun publish --access public --tag ${npmTag}`
+  await $`cd dist/${name} && chmod 777 -R . && bun publish --access public --tag ${tag}`
 }
-await $`cd ./dist/${pkg.name} && bun publish --access public --tag ${npmTag}`
+await $`cd ./dist/${pkg.name} && bun publish --access public --tag ${tag}`
 
 if (!snapshot) {
   for (const key of Object.keys(binaries)) {
