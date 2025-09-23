@@ -204,7 +204,6 @@ export function Prompt(props: PromptProps) {
                 <text>
                   esc <span style={{ fg: Theme.textMuted }}>interrupt</span>
                 </text>
-                <Shimmer text="working" color={Theme.text} />
               </box>
             </Match>
             <Match when={true}>
