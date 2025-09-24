@@ -18,7 +18,7 @@ import { EventLoop } from "../../../util/eventloop"
 import { CommandProvider, useCommandDialog } from "./component/dialog-command"
 import { DialogAgent } from "./component/dialog-agent"
 import { DialogSessionList } from "./component/dialog-session-list"
-import { KeybindProvider, useKeybind } from "./context/keybind"
+import { KeybindProvider } from "./context/keybind"
 
 export const TuiCommand = cmd({
   command: "$0 [project]",
@@ -138,8 +138,6 @@ function App() {
   createEffect(() => {
     console.log(JSON.stringify(route.data))
   })
-
-  const keybind = useKeybind()
 
   command.register(() => [
     {

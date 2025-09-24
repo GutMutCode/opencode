@@ -14,7 +14,6 @@ import type { FilePart } from "@opencode-ai/sdk"
 import fuzzysort from "fuzzysort"
 import { useCommandDialog } from "./dialog-command"
 import { useKeybind } from "../context/keybind"
-import { useRenderer } from "@opentui/solid"
 
 export type PromptProps = {
   sessionID?: string

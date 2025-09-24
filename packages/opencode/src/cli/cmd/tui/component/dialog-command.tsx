@@ -10,7 +10,6 @@ import {
   type ParentProps,
 } from "solid-js"
 import { useKeyboard } from "@opentui/solid"
-import { Keybind } from "../../../../util/keybind"
 import { useKeybind } from "../context/keybind"
 
 type Context = ReturnType<typeof init>
