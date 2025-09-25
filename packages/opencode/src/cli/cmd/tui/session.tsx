@@ -309,7 +309,7 @@ function ToolPart(props: { part: ToolPart; message: AssistantMessage }) {
     return (
       <box
         {...style}
-        renderAfter={function () {
+        renderBefore={function () {
           resize(this as BoxRenderable)
         }}
       >
