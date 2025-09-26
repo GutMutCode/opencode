@@ -1,6 +1,6 @@
 import type { Message, Agent, Provider, Session, Part, Config, Path, File, FileNode, Command } from "@opencode-ai/sdk"
 import { createStore, produce, reconcile } from "solid-js/store"
-import { createContext, Show, useContext, type ParentProps } from "solid-js"
+import { createContext, createMemo, Show, useContext, type ParentProps } from "solid-js"
 import { useSDK, useEvent } from "@/context"
 import { Binary } from "@/utils/binary"
 
@@ -96,21 +96,27 @@ function init() {
   })
 
   const sdk = useSDK()
-  Promise.all([
-    sdk.config.providers().then((x) => setStore("provider", x.data!.providers)),
-    sdk.command.list().then((x) => setStore("command", x.data ?? [])),
-    sdk.path.get().then((x) => setStore("path", x.data!)),
-    sdk.app.agents().then((x) => setStore("agent", x.data ?? [])),
-    sdk.session.list().then((x) =>
-      setStore(
-        "session",
-        (x.data ?? []).slice().sort((a, b) => a.id.localeCompare(b.id)),
+
+  const load = {
+    provider: () => sdk.config.providers().then((x) => setStore("provider", x.data!.providers)),
+    path: () => sdk.path.get().then((x) => setStore("path", x.data!)),
+    agent: () => sdk.app.agents().then((x) => setStore("agent", x.data ?? [])),
+    session: () =>
+      sdk.session.list().then((x) =>
+        setStore(
+          "session",
+          (x.data ?? []).slice().sort((a, b) => a.id.localeCompare(b.id)),
+        ),
       ),
-    ),
-    sdk.config.get().then((x) => setStore("config", x.data!)),
-    sdk.file.status().then((x) => setStore("changes", x.data!)),
-    sdk.file.list({ query: { path: "/" } }).then((x) => setStore("node", x.data!)),
-  ]).then(() => setStore("ready", true))
+    config: () => sdk.config.get().then((x) => setStore("config", x.data!)),
+    changes: () => sdk.file.status().then((x) => setStore("changes", x.data!)),
+    node: () => sdk.file.list({ query: { path: "/" } }).then((x) => setStore("node", x.data!)),
+  }
+
+  Promise.all(Object.values(load).map((p) => p())).then(() => setStore("ready", true))
+
+  const sanitizer = createMemo(() => new RegExp(`${store.path.directory}/`, "g"))
+  const sanitize = (text: string) => text.replace(sanitizer(), "")
 
   const result = {
     data: store,
@@ -141,6 +147,8 @@ function init() {
         )
       },
     },
+    load,
+    sanitize,
   }
   return result
 }

@@ -279,7 +279,7 @@ export function Code(props: Props) {
       }}
       innerHTML={html()}
       class="
-          font-mono text-xs tracking-wide overflow-y-auto no-scrollbar h-full
+          font-mono text-xs tracking-wide overflow-y-auto h-full
           [&]:[counter-reset:line]
           [&_pre]:focus-visible:outline-none
           [&_pre]:overflow-x-auto [&_pre]:no-scrollbar
@@ -435,7 +435,7 @@ function transformerUnifiedDiff(): ShikiTransformer {
         out.push(s)
       }
 
-      return out.join("\n")
+      return out.join("\n").trimEnd()
     },
     code(node) {
       if (isDiff) this.addClassToHast(node, "code-diff")
