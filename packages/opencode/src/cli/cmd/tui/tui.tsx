@@ -20,6 +20,7 @@ import { Instance } from "@/project/instance"
 
 import { Home } from "@tui/routes/home"
 import { Session } from "@tui/routes/session"
+import { PromptHistoryProvider } from "./component/prompt/history"
 
 export const TuiCommand = cmd({
   command: "$0 [project]",
@@ -81,7 +82,9 @@ export const TuiCommand = cmd({
                     <KeybindProvider>
                       <DialogProvider>
                         <CommandProvider>
-                          <App />
+                          <PromptHistoryProvider>
+                            <App />
+                          </PromptHistoryProvider>
                         </CommandProvider>
                       </DialogProvider>
                     </KeybindProvider>
