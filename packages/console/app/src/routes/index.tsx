@@ -348,7 +348,7 @@ export default function Home() {
           </section>
 
           <section data-component="video">
-            <video src={video} autoplay loop muted preload="auto" poster={videoPoster}>
+            <video src={video} autoplay playsinline loop muted preload="auto" poster={videoPoster}>
               Your browser does not support the video tag.
             </video>
           </section>

@@ -276,7 +276,7 @@ export default function Home() {
           </section>
 
           <section data-component="comparison">
-            <video src={compareVideo} autoplay loop muted preload="auto" poster={compareVideoPoster}>
+            <video src={compareVideo} autoplay playsinline loop muted preload="auto" poster={compareVideoPoster}>
               Your browser does not support the video tag.
             </video>
           </section>
