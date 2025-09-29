@@ -76,16 +76,19 @@ export const { use: useKeybind, provider: KeybindProvider } = createSimpleContex
       get leader() {
         return store.leader
       },
-      match(key: keyof KeybindsConfig, evt: ParsedKey) {
-        const keybind = keybinds()[key]
-        if (!keybind) return false
-        const parsed: Keybind.Info = {
+      parse(evt: ParsedKey) {
+        return {
           ctrl: evt.ctrl,
           name: evt.name,
           shift: false,
           leader: store.leader,
           option: evt.option,
         }
+      },
+      match(key: keyof KeybindsConfig, evt: ParsedKey) {
+        const keybind = keybinds()[key]
+        if (!keybind) return false
+        const parsed: Keybind.Info = result.parse(evt)
         for (const key of keybind) {
           if (Keybind.match(key, parsed)) {
             return true

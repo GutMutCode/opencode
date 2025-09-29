@@ -4,6 +4,7 @@ import { useSync } from "@tui/context/sync"
 import { map, pipe, flatMap, entries, filter, isDeepEqual } from "remeda"
 import { DialogSelect } from "@tui/ui/dialog-select"
 import { useDialog } from "@tui/ui/dialog"
+import { Keybind } from "@/util/keybind"
 
 export function DialogModel() {
   const local = useLocal()

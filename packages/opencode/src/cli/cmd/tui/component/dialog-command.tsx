@@ -11,17 +11,22 @@ import {
 } from "solid-js"
 import { useKeyboard } from "@opentui/solid"
 import { useKeybind } from "@tui/context/keybind"
+import type { KeybindsConfig } from "@opencode-ai/sdk"
 
 type Context = ReturnType<typeof init>
 const ctx = createContext<Context>()
 
+export type CommandOption = DialogSelectOption & {
+  keybind?: keyof KeybindsConfig
+}
+
 function init() {
-  const [registrations, setRegistrations] = createSignal<Accessor<DialogSelectOption[]>[]>([])
+  const [registrations, setRegistrations] = createSignal<Accessor<CommandOption[]>[]>([])
   const dialog = useDialog()
+  const keybind = useKeybind()
   const options = createMemo(() => {
     return registrations().flatMap((x) => x())
   })
-  const keybind = useKeybind()
 
   useKeyboard((evt) => {
     for (const option of options()) {
@@ -42,7 +47,7 @@ function init() {
         }
       }
     },
-    register(cb: () => DialogSelectOption[]) {
+    register(cb: () => CommandOption[]) {
       const results = createMemo(cb)
       setRegistrations((arr) => [results, ...arr])
       onCleanup(() => {
@@ -78,6 +83,12 @@ export function CommandProvider(props: ParentProps) {
   return <ctx.Provider value={value}>{props.children}</ctx.Provider>
 }
 
-function DialogCommand(props: { options: DialogSelectOption[] }) {
-  return <DialogSelect title="Commands" options={props.options} />
+function DialogCommand(props: { options: CommandOption[] }) {
+  const keybind = useKeybind()
+  return (
+    <DialogSelect
+      title="Commands"
+      options={props.options.map((x) => ({ ...x, footer: x.keybind ? keybind.print(x.keybind) : undefined }))}
+    />
+  )
 }

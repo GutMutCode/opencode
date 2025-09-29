@@ -4,6 +4,7 @@ import { useRoute } from "@tui/context/route"
 import { useSync } from "@tui/context/sync"
 import { createMemo, onMount } from "solid-js"
 import { Locale } from "@/util/locale"
+import { Keybind } from "@/util/keybind"
 
 export function DialogSessionList() {
   const dialog = useDialog()
@@ -45,6 +46,13 @@ export function DialogSessionList() {
         })
         dialog.clear()
       }}
+      keybind={[
+        {
+          keybind: Keybind.parse("del")[0],
+          title: "delete",
+          onTrigger: (option) => {},
+        },
+      ]}
     />
   )
 }

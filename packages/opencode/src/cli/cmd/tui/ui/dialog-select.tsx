@@ -7,14 +7,19 @@ import { useKeyboard } from "@opentui/solid"
 import * as fuzzysort from "fuzzysort"
 import { isDeepEqual } from "remeda"
 import { useDialog, type DialogContext } from "@tui/ui/dialog"
-import type { KeybindsConfig } from "@opencode-ai/sdk"
 import { useKeybind } from "@tui/context/keybind"
+import { Keybind } from "@/util/keybind"
 
 export interface DialogSelectProps<T> {
   title: string
   options: DialogSelectOption<T>[]
   onFilter?: (query: string) => void
   onSelect?: (option: DialogSelectOption<T>) => void
+  keybind?: {
+    keybind: Keybind.Info
+    title: string
+    onTrigger: (option: DialogSelectOption<T>) => void
+  }[]
   limit?: number
   current?: T
 }
@@ -22,7 +27,6 @@ export interface DialogSelectProps<T> {
 export interface DialogSelectOption<T = any> {
   title: string
   value: T
-  keybind?: keyof KeybindsConfig
   description?: string
   footer?: string
   category?: string
@@ -99,6 +103,7 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
     }
   }
 
+  const keybind = useKeybind()
   useKeyboard((evt) => {
     if (evt.name === "up") move(-1)
     if (evt.name === "down") move(1)
@@ -109,10 +114,15 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
       if (option.onSelect) option.onSelect(dialog)
       props.onSelect?.(option)
     }
+
+    for (const item of props.keybind ?? []) {
+      if (Keybind.match(item.keybind, keybind.parse(evt))) {
+        item.onTrigger(selected())
+      }
+    }
   })
 
   let scroll: ScrollBoxRenderable
-  const keybind = useKeybind()
 
   return (
     <box gap={1}>
@@ -179,7 +189,7 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
                     >
                       <Option
                         title={option.title}
-                        footer={option.footer ?? (option.keybind ? keybind.print(option.keybind as any) : undefined)}
+                        footer={option.footer}
                         description={option.description !== category ? option.description : undefined}
                         active={active()}
                         current={isDeepEqual(option.value, props.current)}
@@ -192,17 +202,15 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
           )}
         </For>
       </scrollbox>
-      <box paddingRight={2} paddingLeft={3} flexDirection="row">
-        {/*
-        <text fg={Theme.text} attributes={TextAttributes.BOLD}>
-          n
-        </text>
-        <text fg={Theme.textMuted}> new</text>
-        <text fg={Theme.text} attributes={TextAttributes.BOLD}>
-          {"   "}r
-        </text>
-        <text fg={Theme.textMuted}> rename</text>
-        */}
+      <box paddingRight={2} paddingLeft={3} flexDirection="row" paddingBottom={1}>
+        <For each={props.keybind ?? []}>
+          {(item) => (
+            <text>
+              <span style={{ fg: Theme.text, attributes: TextAttributes.BOLD }}>{Keybind.toString(item.keybind)}</span>
+              <span style={{ fg: Theme.textMuted }}> {item.title}</span>
+            </text>
+          )}
+        </For>
       </box>
     </box>
   )
