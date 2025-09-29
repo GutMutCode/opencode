@@ -111,7 +111,7 @@ export default function Home() {
               <li><a href="https://github.com/sst/opencode"
                      target="_blank">GitHub <span>[25K]</span></a></li>
               <li><a href="../docs">Docs</a></li>
-              <li><a href="/auth">Login</a></li>
+              <li><a href="auth">Login</a></li>
             </ul>
           </nav>
           <nav data-component="nav-mobile">
@@ -229,7 +229,7 @@ export default function Home() {
                     </svg>
                   </div>
                 </div>
-                <button>
+                <a href="auth">
                   <span>Get started with Zen </span>
                   <svg width="24" height="24"
                        viewBox="0 0 24 24"
@@ -240,7 +240,7 @@ export default function Home() {
                           stroke-width="1.5" stroke-linecap="square"/>
                   </svg>
 
-                </button>
+                </a>
 
               </div>
               <div data-slot="pricing-copy">

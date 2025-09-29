@@ -243,7 +243,7 @@
         }
       }
 
-      button {
+      a {
         background: var(--color-background-strong);
         padding: 8px 20px;
         color: var(--color-text-inverted);
@@ -251,12 +251,14 @@
         border-radius: 4px;
         font-weight: 500;
         cursor: pointer;
-        margin-bottom: 32px;
+        margin-bottom: 56px;
         display: flex;
+        width: fit-content;
         gap: 12px;
+        text-decoration: none;
       }
 
-      button:hover {
+      a:hover {
         background: var(--color-background-strong-hover);
       }
 
@@ -550,11 +552,20 @@
       @media (max-width: 60rem) {
         flex-direction: column-reverse;
         gap: 24px;
+        padding: 24px 48px;
       }
 
       [data-slot="name"] {
         display: flex;
         gap: 16px;
+
+        strong {
+          font-weight: 500;
+        }
+
+        span {
+          color: var(--color-text);
+        }
 
         @media (max-width: 60rem) {
           flex-direction: column;
