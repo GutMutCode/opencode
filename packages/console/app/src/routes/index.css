@@ -231,11 +231,7 @@
     max-width: 100%;
     padding: calc(var(--vertical-padding)*2) var(--padding);
 
-    [data-slot="zen logo dark"] {
-      display: none;
-    }
-
-    @media (max-width: 60Rem) {
+    @media (max-width: 30rem) {
       padding: var(--vertical-padding) var(--padding)
     }
 
