@@ -710,6 +710,29 @@
       background: none;
       border: none;
       padding: 0;
+
+      [data-slot="faq-icon-plus"] {
+        flex-shrink: 0;
+        [data-closed] & {
+          display: block;
+        }
+        [data-expanded] & {
+          display: none;
+        }
+      }
+      [data-slot="faq-icon-minus"] {
+        flex-shrink: 0;
+        [data-closed] & {
+          display: none;
+        }
+        [data-expanded] & {
+          display: block;
+        }
+      }
+      [data-slot="faq-question-text"] {
+        flex-grow: 1;
+        text-align: left;
+      }
     }
 
     [data-slot="faq-answer"] {
