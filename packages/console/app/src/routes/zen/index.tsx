@@ -183,7 +183,7 @@ export default function Home() {
               <li>
                 <span>[2]</span>
                 <div>
-                  <strong>Use Zen with transparent pricing</strong> - pay per request with zero markups
+                  <strong>Use Zen with transparent pricing</strong> - <a href="./../docs/zen/#pricing">pay per request</a> with zero markups
                 </div>
               </li>
               <li>
@@ -300,7 +300,7 @@ export default function Home() {
               </li>
               <li>
                 <Faq question="How much does Zen cost?">
-                  Zen charges per request with zero markups, so you pay exactly what the model provider charges. Your
+                  Zen <a href="/../docs/zen/#pricing">charges per request</a> with zero markups, so you pay exactly what the model provider charges. Your
                   total cost depends on usage, and you can set monthly spend limits in your <a href="auth">account</a>.
                   To cover costs, OpenCode adds only a small payment processing fee of $1.23 per $20 balance top-up.
                 </Faq>
