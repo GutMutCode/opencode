@@ -90,7 +90,7 @@
     margin-left: 40px;
     display: flex;
     gap: 64px !important;
-    
+
     @media (max-width: 60rem) {
       gap: 56px !important;
     }
@@ -398,13 +398,19 @@
         border-radius: 4px;
 
         [data-slot="command-script"] {
-          display: inline-block;   /* or flex, but not plain inline */
+          display: inline-block;
           max-width: 100%;
-          width: calc(100% - 40px);/* let it shrink inside parent */
           overflow: hidden;
           text-overflow: ellipsis;
           white-space: nowrap;
-          vertical-align: middle;  /* keeps alignment neat */
+          vertical-align: middle;
+
+
+
+          @media (max-width: 35rem) {
+            width: calc(100% - 40px) !important;
+          }
+
         }
 
         [data-slot="highlight"] {
