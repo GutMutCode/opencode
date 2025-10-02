@@ -27,7 +27,7 @@ export function Footer() {
         <A href="https://opencode.ai/discord">Discord</A>
       </div>
       <div data-slot="cell">
-        <A href="https://x/opencode">X</A>
+        <A href="https://x.com/opencode">X</A>
       </div>
     </footer>
   )
