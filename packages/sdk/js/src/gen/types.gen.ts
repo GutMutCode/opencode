@@ -1115,6 +1115,14 @@ export type EventFileEdited = {
   }
 }
 
+export type EventFileWatcherUpdated = {
+  type: "file.watcher.updated"
+  properties: {
+    file: string
+    event: "add" | "change" | "unlink"
+  }
+}
+
 export type EventTodoUpdated = {
   type: "todo.updated"
   properties: {
@@ -1170,6 +1178,7 @@ export type Event =
   | EventPermissionUpdated
   | EventPermissionReplied
   | EventFileEdited
+  | EventFileWatcherUpdated
   | EventTodoUpdated
   | EventSessionIdle
   | EventSessionUpdated
