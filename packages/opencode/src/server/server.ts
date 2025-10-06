@@ -31,6 +31,7 @@ import { SessionRevert } from "../session/revert"
 import { lazy } from "../util/lazy"
 import { Todo } from "../session/todo"
 import { InstanceBootstrap } from "../project/bootstrap"
+import { Identifier } from "@/id/id"
 
 const ERRORS = {
   400: {
@@ -507,6 +508,36 @@ export namespace Server {
           const body = c.req.valid("json")
           await Session.initialize({ ...body, sessionID })
           return c.json(true)
+        },
+      )
+      .post(
+        "/session/:id/fork",
+        describeRoute({
+          description: "Fork an existing session at a specific message",
+          operationId: "session.fork",
+          responses: {
+            200: {
+              description: "200",
+              content: {
+                "application/json": {
+                  schema: resolver(Session.Info),
+                },
+              },
+            },
+          },
+        }),
+        validator(
+          "param",
+          z.object({
+            id: Identifier.schema("session").meta({ description: "Session ID" }),
+          }),
+        ),
+        validator("json", Session.fork.schema.omit({ sessionID: true })),
+        async (c) => {
+          const sessionID = c.req.valid("param").id
+          const body = c.req.valid("json")
+          const result = await Session.fork({ ...body, sessionID })
+          return c.json(result)
         },
       )
       .post(

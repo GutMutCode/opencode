@@ -1521,6 +1521,31 @@ export type SessionInitResponses = {
 
 export type SessionInitResponse = SessionInitResponses[keyof SessionInitResponses]
 
+export type SessionForkData = {
+  body?: {
+    messageID?: string
+  }
+  path: {
+    /**
+     * Session ID
+     */
+    id: string
+  }
+  query?: {
+    directory?: string
+  }
+  url: "/session/{id}/fork"
+}
+
+export type SessionForkResponses = {
+  /**
+   * 200
+   */
+  200: Session
+}
+
+export type SessionForkResponse = SessionForkResponses[keyof SessionForkResponses]
+
 export type SessionAbortData = {
   body?: never
   path: {

@@ -17,6 +17,7 @@ import { MessageV2 } from "./message-v2"
 import { Project } from "../project/project"
 import { Instance } from "../project/instance"
 import { SessionPrompt } from "./prompt"
+import { fn } from "@/util/fn"
 
 export namespace Session {
   const log = Log.create({ service: "session" })
@@ -99,6 +100,37 @@ export namespace Session {
       title,
     })
   }
+
+  export const fork = fn(
+    z.object({
+      sessionID: Identifier.schema("session"),
+      messageID: Identifier.schema("message").optional(),
+    }),
+    async (input) => {
+      const session = await createNext({
+        directory: Instance.directory,
+      })
+      const msgs = await messages(input.sessionID)
+      for (const msg of msgs) {
+        if (input.messageID && msg.info.id >= input.messageID) break
+        const cloned = await updateMessage({
+          ...msg.info,
+          sessionID: session.id,
+          id: Identifier.ascending("message"),
+        })
+
+        for (const part of msg.parts) {
+          await updatePart({
+            ...part,
+            id: Identifier.ascending("part"),
+            messageID: cloned.id,
+            sessionID: session.id,
+          })
+        }
+      }
+      return session
+    },
+  )
 
   export async function touch(sessionID: string) {
     await update(sessionID, (draft) => {

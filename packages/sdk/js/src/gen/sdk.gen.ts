@@ -36,6 +36,8 @@ import type {
   SessionTodoResponses,
   SessionInitData,
   SessionInitResponses,
+  SessionForkData,
+  SessionForkResponses,
   SessionAbortData,
   SessionAbortResponses,
   SessionUnshareData,
@@ -310,6 +312,20 @@ class Session extends _HeyApiClient {
   public init<ThrowOnError extends boolean = false>(options: Options<SessionInitData, ThrowOnError>) {
     return (options.client ?? this._client).post<SessionInitResponses, unknown, ThrowOnError>({
       url: "/session/{id}/init",
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        ...options.headers,
+      },
+    })
+  }
+
+  /**
+   * Fork an existing session at a specific message
+   */
+  public fork<ThrowOnError extends boolean = false>(options: Options<SessionForkData, ThrowOnError>) {
+    return (options.client ?? this._client).post<SessionForkResponses, unknown, ThrowOnError>({
+      url: "/session/{id}/fork",
       ...options,
       headers: {
         "Content-Type": "application/json",
