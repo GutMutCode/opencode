@@ -1136,7 +1136,7 @@ export namespace SessionPrompt {
         const p = await Session.getParts(assistantMsg.id)
         for (const part of p) {
           if (part.type === "tool" && part.state.status !== "completed" && part.state.status !== "error") {
-            Session.updatePart({
+            await Session.updatePart({
               ...part,
               state: {
                 ...part.state,

@@ -259,37 +259,51 @@ export function Session() {
             {(message, index) => (
               <Switch>
                 <Match when={message.id === revert()?.messageID}>
-                  <box
-                    marginTop={1}
-                    flexShrink={0}
-                    border={["left"]}
-                    customBorderChars={SplitBorder.customBorderChars}
-                    borderColor={Theme.backgroundPanel}
-                  >
-                    <box paddingTop={1} paddingBottom={1} paddingLeft={2} backgroundColor={Theme.backgroundPanel}>
-                      <text fg={Theme.textMuted}>{revert()!.reverted.length} message reverted</text>
-                      <text fg={Theme.textMuted}>
-                        <span style={{ fg: Theme.text }}>{keybind.print("messages_redo")}</span> or /redo to restore
-                      </text>
-                      <Show when={revert()!.diffFiles?.length}>
-                        <box marginTop={1}>
-                          <For each={revert()!.diffFiles}>
-                            {(file) => (
-                              <text>
-                                {file.filename}
-                                <Show when={file.additions > 0}>
-                                  <span style={{ fg: Theme.diffAdded }}> +{file.additions}</span>
-                                </Show>
-                                <Show when={file.deletions > 0}>
-                                  <span style={{ fg: Theme.diffRemoved }}> -{file.deletions}</span>
-                                </Show>
-                              </text>
-                            )}
-                          </For>
+                  {(function () {
+                    const command = useCommandDialog()
+                    const [hover, setHover] = createSignal(false)
+                    return (
+                      <box
+                        onMouseOver={() => setHover(true)}
+                        onMouseOut={() => setHover(false)}
+                        onMouseUp={() => command.trigger("session.redo")}
+                        marginTop={1}
+                        flexShrink={0}
+                        border={["left"]}
+                        customBorderChars={SplitBorder.customBorderChars}
+                        borderColor={Theme.backgroundPanel}
+                      >
+                        <box
+                          paddingTop={1}
+                          paddingBottom={1}
+                          paddingLeft={2}
+                          backgroundColor={hover() ? Theme.backgroundElement : Theme.backgroundPanel}
+                        >
+                          <text fg={Theme.textMuted}>{revert()!.reverted.length} message reverted</text>
+                          <text fg={Theme.textMuted}>
+                            <span style={{ fg: Theme.text }}>{keybind.print("messages_redo")}</span> or /redo to restore
+                          </text>
+                          <Show when={revert()!.diffFiles?.length}>
+                            <box marginTop={1}>
+                              <For each={revert()!.diffFiles}>
+                                {(file) => (
+                                  <text>
+                                    {file.filename}
+                                    <Show when={file.additions > 0}>
+                                      <span style={{ fg: Theme.diffAdded }}> +{file.additions}</span>
+                                    </Show>
+                                    <Show when={file.deletions > 0}>
+                                      <span style={{ fg: Theme.diffRemoved }}> -{file.deletions}</span>
+                                    </Show>
+                                  </text>
+                                )}
+                              </For>
+                            </box>
+                          </Show>
                         </box>
-                      </Show>
-                    </box>
-                  </box>
+                      </box>
+                    )
+                  })()}
                 </Match>
                 <Match when={revert()?.messageID && message.id >= revert()!.messageID}>
                   <></>
