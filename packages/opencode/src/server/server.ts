@@ -1194,7 +1194,7 @@ export namespace Server {
               description: "MCP server status",
               content: {
                 "application/json": {
-                  schema: resolver(z.any()),
+                  schema: resolver(z.record(z.string(), MCP.Status)),
                 },
               },
             },

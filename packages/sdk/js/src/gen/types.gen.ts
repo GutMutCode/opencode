@@ -1005,6 +1005,21 @@ export type Agent = {
   }
 }
 
+export type McpStatusConnected = {
+  status: "connected"
+}
+
+export type McpStatusDisabled = {
+  status: "disabled"
+}
+
+export type McpStatusFailed = {
+  status: "failed"
+  error: string
+}
+
+export type McpStatus = McpStatusConnected | McpStatusDisabled | McpStatusFailed
+
 export type OAuth = {
   type: "oauth"
   refresh: string
@@ -2086,8 +2101,12 @@ export type McpStatusResponses = {
   /**
    * MCP server status
    */
-  200: unknown
+  200: {
+    [key: string]: McpStatus
+  }
 }
+
+export type McpStatusResponse = McpStatusResponses[keyof McpStatusResponses]
 
 export type TuiAppendPromptData = {
   body?: {
