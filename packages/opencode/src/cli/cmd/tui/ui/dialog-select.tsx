@@ -1,7 +1,7 @@
 import { InputRenderable, RGBA, ScrollBoxRenderable, TextAttributes } from "@opentui/core"
 import { Theme } from "@tui/context/theme"
 import { entries, filter, flatMap, groupBy, pipe, take } from "remeda"
-import { batch, createEffect, createMemo, For, Show } from "solid-js"
+import { batch, createEffect, createMemo, For, onMount, Show } from "solid-js"
 import { createStore } from "solid-js/store"
 import { useKeyboard, useTerminalDimensions } from "@opentui/solid"
 import * as fuzzysort from "fuzzysort"
@@ -14,6 +14,7 @@ import { Locale } from "@/util/locale"
 export interface DialogSelectProps<T> {
   title: string
   options: DialogSelectOption<T>[]
+  ref?: (ref: DialogSelectRef) => void
   onMove?: (option: DialogSelectOption<T>) => void
   onFilter?: (query: string) => void
   onSelect?: (option: DialogSelectOption<T>) => void
@@ -35,6 +36,10 @@ export interface DialogSelectOption<T = any> {
   disabled?: boolean
   bg?: string
   onSelect?: (ctx: DialogContext) => void
+}
+
+export type DialogSelectRef = {
+  filter: string
 }
 
 export function DialogSelect<T>(props: DialogSelectProps<T>) {
@@ -134,6 +139,12 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
   })
 
   let scroll: ScrollBoxRenderable
+  const ref: DialogSelectRef = {
+    get filter() {
+      return store.filter
+    },
+  }
+  props.ref?.(ref)
 
   return (
     <box gap={1}>

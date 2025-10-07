@@ -1,57 +1,63 @@
-import { createMemo } from "solid-js"
+import { createEffect, createMemo, createSignal } from "solid-js"
 import { useLocal } from "@tui/context/local"
 import { useSync } from "@tui/context/sync"
 import { map, pipe, flatMap, entries, filter, isDeepEqual, sortBy } from "remeda"
-import { DialogSelect } from "@tui/ui/dialog-select"
+import { DialogSelect, type DialogSelectRef } from "@tui/ui/dialog-select"
 import { useDialog } from "@tui/ui/dialog"
 
 export function DialogModel() {
   const local = useLocal()
   const sync = useSync()
   const dialog = useDialog()
+  const [ref, setRef] = createSignal<DialogSelectRef>()
 
-  const options = createMemo(() => [
-    ...local.model.recent().map((item) => {
-      const provider = sync.data.provider.find((x) => x.id === item.providerID)!
-      const model = provider.models[item.modelID]
-      return {
-        key: item,
-        value: {
-          providerID: provider.id,
-          modelID: model.id,
-        },
-        title: model.name ?? item.modelID,
-        description: provider.name,
-        category: "Recent",
-      }
-    }),
-    ...pipe(
-      sync.data.provider,
-      sortBy(
-        (provider) => provider.id !== "opencode",
-        (provider) => provider.name,
-      ),
-      flatMap((provider) =>
-        pipe(
-          provider.models,
-          entries(),
-          map(([model, info]) => ({
-            value: {
-              providerID: provider.id,
-              modelID: model,
-            },
-            title: info.name ?? model,
-            description: provider.name,
-            category: provider.name,
-          })),
-          filter((x) => !local.model.recent().find((y) => isDeepEqual(y, x.value))),
+  const options = createMemo(() => {
+    return [
+      ...(!ref()?.filter
+        ? local.model.recent().map((item) => {
+            const provider = sync.data.provider.find((x) => x.id === item.providerID)!
+            const model = provider.models[item.modelID]
+            return {
+              key: item,
+              value: {
+                providerID: provider.id,
+                modelID: model.id,
+              },
+              title: model.name ?? item.modelID,
+              description: provider.name,
+              category: "Recent",
+            }
+          })
+        : []),
+      ...pipe(
+        sync.data.provider,
+        sortBy(
+          (provider) => provider.id !== "opencode",
+          (provider) => provider.name,
+        ),
+        flatMap((provider) =>
+          pipe(
+            provider.models,
+            entries(),
+            map(([model, info]) => ({
+              value: {
+                providerID: provider.id,
+                modelID: model,
+              },
+              title: info.name ?? model,
+              description: provider.name,
+              category: provider.name,
+            })),
+            filter((x) => Boolean(ref()?.filter) || !local.model.recent().find((y) => isDeepEqual(y, x.value))),
+          ),
         ),
       ),
-    ),
-  ])
+    ]
+  })
 
   return (
     <DialogSelect
+      ref={setRef}
       title="Select model"
       current={local.model.current()}
       options={options()}
