@@ -46,6 +46,7 @@ export function Session() {
   const dimensions = useTerminalDimensions()
   const [sidebar, setSidebar] = createSignal<"show" | "hide" | "auto">("auto")
   const wide = createMemo(() => dimensions().width > 120)
+  const sidebarVisible = createMemo(() => sidebar() === "show" || (sidebar() === "auto" && wide()))
 
   createEffect(() => sync.session.sync(route.sessionID))
 
@@ -234,7 +235,7 @@ export function Session() {
       category: "Session",
       onSelect: (dialog) => {
         setSidebar((prev) => {
-          if (prev === "auto") return wide() ? "hide" : "show"
+          if (prev === "auto") return sidebarVisible() ? "hide" : "show"
           if (prev === "show") return "hide"
           return "show"
         })
@@ -284,16 +285,16 @@ export function Session() {
 
   return (
     <box flexDirection="row" paddingBottom={1} paddingTop={1} paddingLeft={2} paddingRight={2} gap={2}>
-      <box flexGrow={1}>
+      <box flexGrow={1} gap={1}>
         <Show when={session()}>
-          <Header />
+          <Show when={!sidebarVisible()}>
+            <Header />
+          </Show>
           <scrollbox
             ref={(r) => (scroll = r)}
             scrollbarOptions={{ visible: false }}
             stickyScroll={true}
             stickyStart="bottom"
-            paddingTop={1}
-            paddingBottom={1}
             flexGrow={1}
           >
             <For each={messages()}>
@@ -365,6 +366,7 @@ export function Session() {
                   </Match>
                   <Match when={message.role === "user"}>
                     <UserMessage
+                      index={index()}
                       onMouseUp={() =>
                         dialog.replace(() => <DialogMessage messageID={message.id} sessionID={route.sessionID} />)
                       }
@@ -395,7 +397,7 @@ export function Session() {
           </box>
         </Show>
       </box>
-      <Show when={sidebar() === "show" || (sidebar() === "auto" && wide())}>
+      <Show when={sidebarVisible()}>
         <Sidebar sessionID={route.sessionID} />
       </Show>
     </box>
@@ -412,7 +414,7 @@ const MIME_BADGE: Record<string, string> = {
   "application/x-directory": "dir",
 }
 
-function UserMessage(props: { message: UserMessage; parts: Part[]; onMouseUp: () => void }) {
+function UserMessage(props: { message: UserMessage; parts: Part[]; onMouseUp: () => void; index: number }) {
   const text = createMemo(() => props.parts.flatMap((x) => (x.type === "text" && !x.synthetic ? [x] : []))[0])
   const files = createMemo(() => props.parts.flatMap((x) => (x.type === "file" ? [x] : [])))
   const sync = useSync()
@@ -433,7 +435,7 @@ function UserMessage(props: { message: UserMessage; parts: Part[]; onMouseUp: ()
         paddingTop={1}
         paddingBottom={1}
         paddingLeft={2}
-        marginTop={1}
+        marginTop={props.index === 0 ? 0 : 1}
         backgroundColor={hover() ? Theme.backgroundElement : Theme.backgroundPanel}
         customBorderChars={SplitBorder.customBorderChars}
         borderColor={Theme.secondary}
@@ -549,9 +551,11 @@ function ReasoningPart(props: { part: ReasoningPart; message: AssistantMessage }
 
 function TextPart(props: { part: TextPart; message: AssistantMessage }) {
   return (
-    <box id={"text-" + props.part.id} paddingLeft={3} marginTop={1} flexShrink={0}>
-      <text>{props.part.text.trim()}</text>
-    </box>
+    <Show when={props.part.text.trim()}>
+      <box id={"text-" + props.part.id} paddingLeft={3} marginTop={1} flexShrink={0}>
+        <text>{props.part.text.trim()}</text>
+      </box>
+    </Show>
   )
 }
 
@@ -596,7 +600,6 @@ function ToolPart(props: { part: ToolPart; message: AssistantMessage }) {
           const el = this as BoxRenderable
           const parent = el.parent
           if (!parent) {
-            setMargin(0)
             return
           }
           if (el.height > 1) {
@@ -608,6 +611,7 @@ function ToolPart(props: { part: ToolPart; message: AssistantMessage }) {
           const previous = children[index - 1]
           if (!previous) {
             setMargin(0)
+            return
           }
           if (previous.height > 1 || previous.id.startsWith("text-")) {
             setMargin(1)
