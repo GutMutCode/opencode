@@ -1,15 +1,11 @@
 #!/usr/bin/env bun
-<<<<<<< HEAD
 
 import solidPlugin from "../../../node_modules/@opentui/solid/scripts/solid-plugin"
-
-=======
 import path from "path"
->>>>>>> dev
+import { $ } from "bun"
+
 const dir = new URL("..", import.meta.url).pathname
 process.chdir(dir)
-import { $ } from "bun"
-import path from "path"
 
 import pkg from "../package.json"
 
