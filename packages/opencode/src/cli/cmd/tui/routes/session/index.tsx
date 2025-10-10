@@ -256,6 +256,7 @@ export function Session() {
     {
       title: "Toggle sidebar",
       value: "session.sidebar.toggle",
+      keybind: "sidebar_toggle",
       category: "Session",
       onSelect: (dialog) => {
         setSidebar((prev) => {

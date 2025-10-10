@@ -332,6 +332,7 @@ export namespace Config {
       project_init: z.string().optional().default("<leader>i").describe("Create/update AGENTS.md"),
       tool_details: z.string().optional().default("<leader>d").describe("Toggle tool details"),
       thinking_blocks: z.string().optional().default("<leader>b").describe("Toggle thinking blocks"),
+      sidebar_toggle: z.string().optional().default("<leader>b").describe("Toggle sidebar"),
       status_view: z.string().optional().default("<leader>s").describe("View status"),
       session_export: z.string().optional().default("<leader>x").describe("Export session to editor"),
       session_new: z.string().optional().default("<leader>n").describe("Create a new session"),

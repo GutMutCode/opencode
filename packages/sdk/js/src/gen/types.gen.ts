@@ -47,6 +47,10 @@ export type KeybindsConfig = {
    */
   thinking_blocks?: string
   /**
+   * Toggle sidebar
+   */
+  sidebar_toggle?: string
+  /**
    * View status
    */
   status_view?: string
