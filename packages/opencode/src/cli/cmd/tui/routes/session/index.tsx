@@ -565,8 +565,7 @@ function ToolPart(props: { part: ToolPart; message: AssistantMessage }) {
   const sync = useSync()
   const [margin, setMargin] = createSignal(0)
   const component = createMemo(() => {
-    const ready = ToolRegistry.ready(props.part.tool)
-    if (!ready) return
+    const render = ToolRegistry.render(props.part.tool) ?? GenericTool
 
     const metadata = props.part.state.status === "pending" ? {} : (props.part.state.metadata ?? {})
     const input = props.part.state.input
@@ -620,8 +619,9 @@ function ToolPart(props: { part: ToolPart; message: AssistantMessage }) {
         }}
       >
         <Dynamic
-          component={ready}
+          component={render}
           input={input}
+          tool={props.part.tool}
           metadata={metadata}
           permission={permission?.metadata ?? {}}
           output={props.part.state.status === "completed" ? props.part.state.output : undefined}
@@ -661,15 +661,23 @@ type ToolProps<T extends Tool.Info> = {
   input: Partial<Tool.InferParameters<T>>
   metadata: Partial<Tool.InferMetadata<T>>
   permission: Record<string, any>
+  tool: string
   output?: string
+}
+function GenericTool(props: ToolProps<any>) {
+  return (
+    <ToolTitle icon="#" fallback="Writing command..." when={true}>
+      {props.tool} {input(props.input)}
+    </ToolTitle>
+  )
 }
 
 const ToolRegistry = (() => {
-  const state: Record<string, { name: string; container: "inline" | "block"; ready?: Component<ToolProps<any>> }> = {}
+  const state: Record<string, { name: string; container: "inline" | "block"; render?: Component<ToolProps<any>> }> = {}
   function register<T extends Tool.Info>(input: {
     name: string
     container: "inline" | "block"
-    ready?: Component<ToolProps<T>>
+    render?: Component<ToolProps<T>>
   }) {
     state[input.name] = input
     return input
@@ -679,8 +687,8 @@ const ToolRegistry = (() => {
     container(name: string) {
       return state[name]?.container
     },
-    ready(name: string) {
-      return state[name]?.ready
+    render(name: string) {
+      return state[name]?.render
     },
   }
 })()
@@ -698,7 +706,7 @@ function ToolTitle(props: { fallback: string; when: any; icon: string; children:
 ToolRegistry.register<typeof BashTool>({
   name: "bash",
   container: "block",
-  ready(props) {
+  render(props) {
     const output = createMemo(() => Bun.stripANSI(props.output?.trim() ?? ""))
     return (
       <>
@@ -721,11 +729,11 @@ ToolRegistry.register<typeof BashTool>({
 ToolRegistry.register<typeof ReadTool>({
   name: "read",
   container: "inline",
-  ready(props) {
+  render(props) {
     return (
       <>
         <ToolTitle icon="→" fallback="Reading file..." when={props.input.filePath}>
-          Read {normalizePath(props.input.filePath!)}
+          Read {normalizePath(props.input.filePath!)} {input(props.input, ["filePath"])}
         </ToolTitle>
       </>
     )
@@ -735,7 +743,7 @@ ToolRegistry.register<typeof ReadTool>({
 ToolRegistry.register<typeof WriteTool>({
   name: "write",
   container: "block",
-  ready(props) {
+  render(props) {
     const lines = createMemo(() => {
       return props.input.content?.split("\n") ?? []
     })
@@ -773,11 +781,12 @@ ToolRegistry.register<typeof WriteTool>({
 ToolRegistry.register<typeof GlobTool>({
   name: "glob",
   container: "inline",
-  ready(props) {
+  render(props) {
     return (
       <>
         <ToolTitle icon="✱" fallback="Finding files..." when={props.input.pattern}>
-          Glob "{props.input.pattern}" <Show when={props.metadata.count}>({props.metadata.count} matches)</Show>
+          Glob "{props.input.pattern}" <Show when={props.input.path}>in {normalizePath(props.input.path)} </Show>
+          <Show when={props.metadata.count}>({props.metadata.count} matches)</Show>
         </ToolTitle>
       </>
     )
@@ -787,10 +796,11 @@ ToolRegistry.register<typeof GlobTool>({
 ToolRegistry.register<typeof GrepTool>({
   name: "grep",
   container: "inline",
-  ready(props) {
+  render(props) {
     return (
       <ToolTitle icon="✱" fallback="Searching content..." when={props.input.pattern}>
-        Grep "{props.input.pattern}"
+        Grep "{props.input.pattern}" <Show when={props.input.path}>in {normalizePath(props.input.path)} </Show>
+        <Show when={props.metadata.matches}>({props.metadata.matches} matches)</Show>
       </ToolTitle>
     )
   },
@@ -799,7 +809,7 @@ ToolRegistry.register<typeof GrepTool>({
 ToolRegistry.register<typeof ListTool>({
   name: "list",
   container: "inline",
-  ready(props) {
+  render(props) {
     const dir = createMemo(() => {
       if (props.input.path) {
         return normalizePath(props.input.path)
@@ -819,7 +829,7 @@ ToolRegistry.register<typeof ListTool>({
 ToolRegistry.register<typeof TaskTool>({
   name: "task",
   container: "block",
-  ready(props) {
+  render(props) {
     return (
       <>
         <ToolTitle icon="%" fallback="Delegating..." when={props.input.description}>
@@ -844,7 +854,7 @@ ToolRegistry.register<typeof TaskTool>({
 ToolRegistry.register<typeof WebFetchTool>({
   name: "webfetch",
   container: "inline",
-  ready(props) {
+  render(props) {
     return (
       <ToolTitle icon="%" fallback="Fetching from the web..." when={(props.input as any).url}>
         WebFetch {(props.input as any).url}
@@ -856,7 +866,7 @@ ToolRegistry.register<typeof WebFetchTool>({
 ToolRegistry.register<typeof EditTool>({
   name: "edit",
   container: "block",
-  ready(props) {
+  render(props) {
     const diff = createMemo(() => {
       const diff = props.metadata.diff ?? props.permission["diff"]
       if (!diff) return null
@@ -923,7 +933,10 @@ ToolRegistry.register<typeof EditTool>({
     return (
       <>
         <ToolTitle icon="←" fallback="Preparing edit..." when={props.input.filePath}>
-          Edit {normalizePath(props.input.filePath!)}
+          Edit {normalizePath(props.input.filePath!)}{" "}
+          {input({
+            replaceAll: props.input.replaceAll,
+          })}
         </ToolTitle>
         <Switch>
           <Match when={props.permission["diff"]}>
@@ -953,7 +966,7 @@ ToolRegistry.register<typeof EditTool>({
 ToolRegistry.register<typeof PatchTool>({
   name: "patch",
   container: "block",
-  ready(props) {
+  render(props) {
     return (
       <>
         <ToolTitle icon="%" fallback="Preparing patch..." when={true}>
@@ -972,7 +985,7 @@ ToolRegistry.register<typeof PatchTool>({
 ToolRegistry.register<typeof TodoWriteTool>({
   name: "todowrite",
   container: "block",
-  ready(props) {
+  render(props) {
     return (
       <box>
         <For each={props.input.todos ?? []}>
@@ -987,9 +1000,19 @@ ToolRegistry.register<typeof TodoWriteTool>({
   },
 })
 
-function normalizePath(input: string) {
+function normalizePath(input?: string) {
+  if (!input) return ""
   if (path.isAbsolute(input)) {
     return path.relative(process.cwd(), input) || "."
   }
   return input
+}
+
+function input(input: Record<string, any>, omit?: string[]): string {
+  const primitives = Object.entries(input).filter(([key, value]) => {
+    if (omit?.includes(key)) return false
+    return typeof value === "string" || typeof value === "number" || typeof value === "boolean"
+  })
+  if (primitives.length === 0) return ""
+  return `[${primitives.map(([key, value]) => `${key}=${value}`).join(", ")}]`
 }
