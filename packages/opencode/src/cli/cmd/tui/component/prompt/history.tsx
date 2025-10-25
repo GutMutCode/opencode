@@ -32,7 +32,9 @@ export const { use: usePromptHistory, provider: PromptHistoryProvider } = create
 
     return {
       move(direction: 1 | -1, input: string) {
-        const current = store.history.at(store.index)!
+        if (!store.history.length) return undefined
+        const current = store.history.at(store.index)
+        if (!current) return undefined
         if (current.input !== input && input.length) return
         setStore(
           produce((draft) => {
@@ -47,7 +49,7 @@ export const { use: usePromptHistory, provider: PromptHistoryProvider } = create
             input: "",
             parts: [],
           }
-        return store.history.at(store.index)!
+        return store.history.at(store.index)
       },
       append(item: PromptInfo) {
         item = clone(item)
