@@ -431,8 +431,7 @@ export namespace ACP {
 
       await Promise.all(
         Object.entries(mcpServers).map(async ([key, mcp]) => {
-          // TODO: add to mcp
-          // await MCP.add(key, mcp)
+          await MCP.add(key, mcp)
         }),
       )
 
