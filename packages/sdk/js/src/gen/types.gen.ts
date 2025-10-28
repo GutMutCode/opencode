@@ -1204,6 +1204,7 @@ export type EventMessagePartUpdated = {
   type: "message.part.updated"
   properties: {
     part: Part
+    delta?: string
   }
 }
 
@@ -1283,6 +1284,13 @@ export type EventSessionIdle = {
   }
 }
 
+export type EventSessionCreated = {
+  type: "session.created"
+  properties: {
+    info: Session
+  }
+}
+
 export type EventSessionUpdated = {
   type: "session.updated"
   properties: {
@@ -1327,6 +1335,7 @@ export type Event =
   | EventFileWatcherUpdated
   | EventTodoUpdated
   | EventSessionIdle
+  | EventSessionCreated
   | EventSessionUpdated
   | EventSessionDeleted
   | EventSessionError
@@ -1976,13 +1985,10 @@ export type SessionPromptData = {
       modelID: string
     }
     agent?: string
+    noReply?: boolean
     system?: string
     tools?: {
       [key: string]: boolean
-    }
-    acpConnection?: {
-      connection: unknown
-      sessionId: string
     }
     parts: Array<TextPartInput | FilePartInput | AgentPartInput>
   }

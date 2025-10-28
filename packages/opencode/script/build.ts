@@ -4,8 +4,12 @@ import solidPlugin from "../node_modules/@opentui/solid/scripts/solid-plugin"
 import path from "path"
 import fs from "fs"
 import { $ } from "bun"
+import { fileURLToPath } from "url"
 
-const dir = new URL("..", import.meta.url).pathname
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
+const dir = path.resolve(__dirname, "..")
+
 process.chdir(dir)
 
 import pkg from "../package.json"

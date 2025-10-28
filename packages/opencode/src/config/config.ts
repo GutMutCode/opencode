@@ -1,7 +1,7 @@
 import { Log } from "../util/log"
 import path from "path"
 import os from "os"
-import z from "zod/v4"
+import z from "zod"
 import { Filesystem } from "../util/filesystem"
 import { ModelsDev } from "../provider/models"
 import { mergeDeep, pipe } from "remeda"
@@ -60,6 +60,11 @@ export namespace Config {
         Filesystem.up({ targets: [".opencode"], start: Instance.directory, stop: Instance.worktree }),
       )),
     ]
+
+    if (Flag.OPENCODE_CONFIG_DIR) {
+      directories.push(Flag.OPENCODE_CONFIG_DIR)
+      log.debug("loading config from OPENCODE_CONFIG_DIR", { path: Flag.OPENCODE_CONFIG_DIR })
+    }
 
     for (const dir of directories) {
       await assertValid(dir)
@@ -584,6 +589,7 @@ export namespace Config {
                 .optional(),
             })
             .optional(),
+          chatMaxRetries: z.number().optional().describe("Number of retries for chat completions on failure"),
           disable_paste_summary: z.boolean().optional(),
         })
         .optional(),
