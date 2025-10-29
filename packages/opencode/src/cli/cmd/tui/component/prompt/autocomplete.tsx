@@ -56,7 +56,7 @@ export function Autocomplete(props: {
     const currentCursorOffset = input.visualCursor.offset
 
     const charAfterCursor = props.value.at(currentCursorOffset)
-    const needsSpace = charAfterCursor !== " " && charAfterCursor !== undefined
+    const needsSpace = charAfterCursor !== " "
     const append = "@" + text + (needsSpace ? " " : "")
 
     input.cursorOffset = store.index

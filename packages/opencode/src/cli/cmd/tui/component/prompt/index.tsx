@@ -11,7 +11,7 @@ import {
 } from "@opentui/core"
 import { createEffect, createMemo, Match, Switch, type JSX, onMount } from "solid-js"
 import { useLocal } from "@tui/context/local"
-import { useTheme } from "@tui/context/theme"
+import { SyntaxTheme, useTheme } from "@tui/context/theme"
 import { SplitBorder } from "@tui/component/border"
 import { useSDK } from "@tui/context/sdk"
 import { useRoute } from "@tui/context/route"
@@ -59,7 +59,7 @@ export function Prompt(props: PromptProps) {
   const history = usePromptHistory()
   const command = useCommandDialog()
   const renderer = useRenderer()
-  const { theme, syntaxTheme } = useTheme()
+  const { theme } = useTheme()
 
   const textareaKeybindings = createMemo(() => {
     const newlineBindings = keybind.all.input_newline || []
@@ -85,9 +85,9 @@ export function Prompt(props: PromptProps) {
     ]
   })
 
-  const fileStyleId = syntaxTheme().getStyleId("extmark.file")!
-  const agentStyleId = syntaxTheme().getStyleId("extmark.agent")!
-  const pasteStyleId = syntaxTheme().getStyleId("extmark.paste")!
+  const fileStyleId = SyntaxTheme.getStyleId("extmark.file")!
+  const agentStyleId = SyntaxTheme.getStyleId("extmark.agent")!
+  const pasteStyleId = SyntaxTheme.getStyleId("extmark.paste")!
   let promptPartTypeId: number
 
   command.register(() => {
@@ -662,7 +662,7 @@ export function Prompt(props: PromptProps) {
               onMouseDown={(r: MouseEvent) => r.target?.focus()}
               focusedBackgroundColor={theme.backgroundElement}
               cursorColor={theme.primary}
-              syntaxStyle={syntaxTheme}
+              syntaxStyle={SyntaxTheme}
             />
           </box>
           <box

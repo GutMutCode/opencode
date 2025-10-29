@@ -15,7 +15,7 @@ import path from "path"
 import { useRouteData } from "@tui/context/route"
 import { useSync } from "@tui/context/sync"
 import { SplitBorder } from "@tui/component/border"
-import { useTheme } from "@tui/context/theme"
+import { SyntaxTheme, useTheme } from "@tui/context/theme"
 import { BoxRenderable, ScrollBoxRenderable, addDefaultParsers } from "@opentui/core"
 import { Prompt, type PromptRef } from "@tui/component/prompt"
 import type {
@@ -56,8 +56,6 @@ import { DialogTimeline } from "./dialog-timeline"
 import { Sidebar } from "./sidebar"
 import { LANGUAGE_EXTENSIONS } from "@/lsp/language"
 import parsers from "../../../../../../parsers-config.json"
-import { Clipboard } from "../../util/clipboard"
-import { Toast, useToast } from "../../ui/toast"
 
 addDefaultParsers(parsers.parsers)
 
@@ -936,7 +934,7 @@ ToolRegistry.register<typeof WriteTool>({
   name: "write",
   container: "block",
   render(props) {
-    const { theme, syntaxTheme } = useTheme()
+    const { theme } = useTheme()
     const lines = createMemo(() => {
       return props.input.content?.split("\n") ?? []
     })
@@ -967,7 +965,7 @@ ToolRegistry.register<typeof WriteTool>({
           <box paddingLeft={1} flexGrow={1}>
             <code
               filetype={filetype(props.input.filePath!)}
-              syntaxStyle={syntaxTheme()}
+              syntaxStyle={SyntaxTheme}
               content={code()}
             />
           </box>
@@ -1070,7 +1068,6 @@ ToolRegistry.register<typeof EditTool>({
   container: "block",
   render(props) {
     const ctx = use()
-    const { syntaxTheme } = useTheme()
 
     const style = createMemo(() => (ctx.width > 120 ? "split" : "stacked"))
 
@@ -1155,16 +1152,16 @@ ToolRegistry.register<typeof EditTool>({
           <Match when={diff() && style() === "split"}>
             <box paddingLeft={1} flexDirection="row" gap={2}>
               <box flexGrow={1} flexBasis={0}>
-                <code filetype={ft()} syntaxStyle={syntaxTheme()} content={diff()!.oldContent} />
+                <code filetype={ft()} syntaxStyle={SyntaxTheme} content={diff()!.oldContent} />
               </box>
               <box flexGrow={1} flexBasis={0}>
-                <code filetype={ft()} syntaxStyle={syntaxTheme()} content={diff()!.newContent} />
+                <code filetype={ft()} syntaxStyle={SyntaxTheme} content={diff()!.newContent} />
               </box>
             </box>
           </Match>
           <Match when={code()}>
             <box paddingLeft={1}>
-              <code filetype={ft()} syntaxStyle={syntaxTheme()} content={code()} />
+              <code filetype={ft()} syntaxStyle={SyntaxTheme} content={code()} />
             </box>
           </Match>
         </Switch>

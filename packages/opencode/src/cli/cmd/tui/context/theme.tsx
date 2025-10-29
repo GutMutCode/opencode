@@ -279,7 +279,13 @@ const syntaxThemeDark = [
     },
   },
   {
-    scope: ["variable.builtin", "type.builtin", "function.builtin", "module.builtin", "constant.builtin"],
+    scope: [
+      "variable.builtin",
+      "type.builtin",
+      "function.builtin",
+      "module.builtin",
+      "constant.builtin",
+    ],
     style: {
       foreground: "#7fd88f",
     },
@@ -325,14 +331,14 @@ const syntaxThemeDark = [
   },
 ]
 
+export const SyntaxTheme = SyntaxStyle.fromTheme(syntaxThemeDark)
+
 export const { use: useTheme, provider: ThemeProvider } = createSimpleContext({
   name: "Theme",
   init: () => {
     const sync = useSync()
     const [selectedTheme, setSelectedTheme] = createSignal<keyof typeof THEMES>("opencode")
     const [theme, setTheme] = createStore({} as Theme)
-    const syntaxTheme = createMemo(() => SyntaxStyle.fromTheme(syntaxThemeDark))
-
     createEffect(() => {
       if (!sync.ready) return
       setSelectedTheme(
@@ -344,13 +350,13 @@ export const { use: useTheme, provider: ThemeProvider } = createSimpleContext({
         }),
       )
     })
+
     createEffect(() => {
       setTheme(reconcile(THEMES[selectedTheme()]))
     })
 
     return {
       theme,
-      syntaxTheme,
       selectedTheme,
       setSelectedTheme,
       get ready() {
