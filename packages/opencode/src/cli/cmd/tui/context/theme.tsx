@@ -113,7 +113,7 @@ function resolveTheme(theme: ThemeJson) {
   function resolveColor(c: ColorValue): RGBA {
     if (typeof c === "string") return c.startsWith("#") ? RGBA.fromHex(c) : resolveColor(defs[c])
     // TODO: support light theme when opentui has the equivalent of lipgloss.AdaptiveColor
-    return resolveColor(c.dark)
+    return resolveColor(c.light)
   }
   return Object.fromEntries(
     Object.entries(theme.theme).map(([key, value]) => {
@@ -625,7 +625,7 @@ export const SyntaxTheme = SyntaxStyle.fromTheme(syntaxThemeDark)
 
 export const { use: useTheme, provider: ThemeProvider } = createSimpleContext({
   name: "Theme",
-  init: () => {
+  init: (props: { mode: "dark" | "light" }) => {
     const sync = useSync()
     const kv = useKV()
 

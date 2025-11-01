@@ -41,12 +41,10 @@ async function getTerminalBackgroundColor(): Promise<"dark" | "light"> {
 
     const handler = (data: Buffer) => {
       const str = data.toString()
-      const match = str.match(/\x1b]11;([^\x07]+)\x07/)
+      const match = str.match(/\x1b]11;([^\x07\x1b]+)/)
       if (match) {
         cleanup()
         const color = match[1]
-        console.log(color)
-
         // Parse RGB values from color string
         // Formats: rgb:RR/GG/BB or #RRGGBB or rgb(R,G,B)
         let r = 0,
@@ -68,7 +66,6 @@ async function getTerminalBackgroundColor(): Promise<"dark" | "light"> {
           g = parseInt(parts[1])
           b = parseInt(parts[2])
         }
-        console.log(r, g, b)
 
         // Calculate luminance using relative luminance formula
         const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
@@ -85,7 +82,7 @@ async function getTerminalBackgroundColor(): Promise<"dark" | "light"> {
     timeout = setTimeout(() => {
       cleanup()
       resolve("dark")
-    }, 1000)
+    }, 5000)
   })
 }
 
@@ -99,8 +96,7 @@ export function tui(input: {
 }) {
   // promise to prevent immediate exit
   return new Promise<void>(async (resolve) => {
-    const backgroundTheme = await getTerminalBackgroundColor()
-    console.log("Terminal background theme:", backgroundTheme)
+    const mode = await getTerminalBackgroundColor()
 
     const routeData: Route | undefined = input.sessionID
       ? {
@@ -128,7 +124,7 @@ export function tui(input: {
                   <RouteProvider data={routeData}>
                     <SDKProvider url={input.url}>
                       <SyncProvider>
-                        <ThemeProvider>
+                        <ThemeProvider mode={mode}>
                           <LocalProvider
                             initialModel={input.model}
                             initialAgent={input.agent}
