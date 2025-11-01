@@ -97,7 +97,6 @@ export function tui(input: {
   // promise to prevent immediate exit
   return new Promise<void>(async (resolve) => {
     const mode = await getTerminalBackgroundColor()
-    console.log(mode)
 
     const routeData: Route | undefined = input.sessionID
       ? {
