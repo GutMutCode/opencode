@@ -20,6 +20,8 @@ export namespace Agent {
         edit: Config.Permission,
         bash: z.record(z.string(), Config.Permission),
         webfetch: Config.Permission.optional(),
+        doom_loop: Config.Permission.optional(),
+        external_directory: Config.Permission.optional(),
       }),
       model: z
         .object({
@@ -45,6 +47,8 @@ export namespace Agent {
         "*": "allow",
       },
       webfetch: "allow",
+      doom_loop: "ask",
+      external_directory: "ask",
     }
     const agentPermission = mergeAgentPermissions(defaultPermission, cfg.permission ?? {})
 
