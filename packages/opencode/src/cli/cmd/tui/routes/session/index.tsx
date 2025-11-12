@@ -902,7 +902,9 @@ function AssistantMessage(props: { message: AssistantMessage; parts: Part[]; las
           )
         }}
       </For>
-      <Show when={props.message.error}>
+      <Show
+        when={props.message.error && (props.message.error.name !== "APIError" || !props.message.error.data.isRetryable)}
+      >
         <box
           border={["left"]}
           paddingTop={1}
@@ -919,7 +921,9 @@ function AssistantMessage(props: { message: AssistantMessage; parts: Part[]; las
       <Show
         when={
           !props.message.time.completed ||
-          (props.last && props.parts.some((item) => item.type === "step-finish" && item.reason === "tool-calls"))
+          (props.last &&
+            (props.parts.some((item) => item.type === "step-finish" && item.reason === "tool-calls") ||
+              (props.message.error?.name === "APIError" && props.message.error.data.isRetryable)))
         }
       >
         <box
@@ -933,6 +937,9 @@ function AssistantMessage(props: { message: AssistantMessage; parts: Part[]; las
         >
           <text fg={local.agent.color(props.message.mode)}>{Locale.titlecase(props.message.mode)}</text>
           <Shimmer text={`${props.message.modelID}`} color={theme.text} />
+          <Show when={props.message.error && props.message.error.name === "APIError"}>
+            <text fg={theme.error}>{props.message.error!.data.message as string} [retrying]</text>
+          </Show>
         </box>
       </Show>
       <Show

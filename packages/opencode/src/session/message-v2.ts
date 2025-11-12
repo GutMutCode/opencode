@@ -277,6 +277,13 @@ export namespace MessageV2 {
         diffs: Snapshot.FileDiff.array(),
       })
       .optional(),
+    agent: z.string(),
+    model: z.object({
+      providerID: z.string(),
+      modelID: z.string(),
+    }),
+    system: z.string().optional(),
+    tools: z.record(z.string(), z.boolean()).optional(),
   }).meta({
     ref: "UserMessage",
   })
@@ -334,6 +341,7 @@ export namespace MessageV2 {
         write: z.number(),
       }),
     }),
+    finish: z.string().optional(),
   }).meta({
     ref: "AssistantMessage",
   })
@@ -481,6 +489,11 @@ export namespace MessageV2 {
         role: "user",
         time: {
           created: v1.metadata.time.created,
+        },
+        agent: "build",
+        model: {
+          providerID: "opencode",
+          modelID: "opencode",
         },
       }
       const parts = v1.parts.flatMap((part): Part[] => {
