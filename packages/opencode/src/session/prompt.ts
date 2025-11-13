@@ -49,9 +49,9 @@ import { $, fileURLToPath } from "bun"
 import { ConfigMarkdown } from "../config/markdown"
 import { SessionSummary } from "./summary"
 import { NamedError } from "@/util/error"
-import { SessionStatus } from "./status"
 import { SessionLock } from "./lock"
 import { fn } from "@/util/fn"
+import { SessionRetry } from "./retry"
 
 export namespace SessionPrompt {
   const log = Log.create({ service: "session.prompt" })
@@ -59,7 +59,33 @@ export namespace SessionPrompt {
   const MAX_RETRIES = 10
   const DOOM_LOOP_THRESHOLD = 3
 
+  export const Status = z
+    .union([
+      z.object({
+        type: z.literal("idle"),
+      }),
+      z.object({
+        type: z.literal("retry"),
+        attempt: z.number(),
+        message: z.string(),
+      }),
+      z.object({
+        type: z.literal("busy"),
+      }),
+    ])
+    .meta({
+      ref: "SessionStatus",
+    })
+  export type Status = z.infer<typeof Status>
+
   export const Event = {
+    Status: Bus.event(
+      "session.status",
+      z.object({
+        sessionID: z.string(),
+        status: Status,
+      }),
+    ),
     Idle: Bus.event(
       "session.idle",
       z.object({
@@ -77,6 +103,8 @@ export namespace SessionPrompt {
         }[]
       >()
       const pending = new Set<Promise<void>>()
+      const status: Record<string, Status> = {}
+      const abort: Record<string, AbortController> = {}
 
       const track = (promise: Promise<void>) => {
         pending.add(promise)
@@ -84,6 +112,8 @@ export namespace SessionPrompt {
       }
 
       return {
+        status,
+        abort,
         queued,
         pending,
         track,
@@ -92,8 +122,25 @@ export namespace SessionPrompt {
     async (current) => {
       current.queued.clear()
       await Promise.allSettled([...current.pending])
+      for (const item of Object.values(current.abort)) {
+        item.abort()
+      }
     },
   )
+
+  export function status() {
+    return state().status
+  }
+
+  export const setStatus = fn(z.object({ sessionID: Identifier.schema("session"), status: Status }), (input) => {
+    Bus.publish(Event.Status, { sessionID: input.sessionID, status: input.status })
+    if (input.status.type === "idle") {
+      delete state().status[input.sessionID]
+      delete state().abort[input.sessionID]
+      return
+    }
+    state().status[input.sessionID] = input.status
+  })
 
   export const PromptInput = z.object({
     sessionID: Identifier.schema("session"),
@@ -206,8 +253,31 @@ export namespace SessionPrompt {
     return loop(input.sessionID)
   })
 
+  function start(sessionID: string) {
+    const s = state()
+    if (s.status[sessionID]) return
+    const controller = new AbortController()
+    s.abort[sessionID] = controller
+    setStatus({ sessionID, status: { type: "busy" } })
+    return controller.signal
+  }
+
+  export function cancel(sessionID: string) {
+    const s = state()
+    const signal = s.abort[sessionID]
+    const status = s.status[sessionID]
+    if (signal) {
+      signal.abort()
+      delete s.abort[sessionID]
+    }
+    if (status) {
+      setStatus({ sessionID, status: { type: "idle" } })
+    }
+    return
+  }
+
   async function loop(sessionID: string) {
-    const abort = SessionStatus.start(sessionID)
+    const abort = start(sessionID)
     if (!abort) {
       return new Promise<MessageV2.WithParts>((resolve) => {
         const queue = state().queued.get(sessionID) ?? []
@@ -218,27 +288,21 @@ export namespace SessionPrompt {
       })
     }
 
-    using _ = defer(() => {
-      SessionStatus.end(sessionID)
-    })
+    using _ = defer(() => cancel(sessionID))
 
     let step = 0
+    let retries = 0
     while (true) {
-      let msgs: MessageV2.WithParts[] = await getMessages({
-        sessionID,
-        signal: abort,
-      })
+      let msgs = await MessageV2.filterCompacted(MessageV2.stream(sessionID))
       const lastUser = msgs.findLast((m) => m.info.role === "user")?.info as MessageV2.User
       if (!lastUser) throw new Error("No user message found in stream. This should never happen.")
       log.info("last user", { id: lastUser.id, model: lastUser.model })
 
       const lastAssistant = msgs.findLast((msg) => msg.info.role === "assistant")?.info as MessageV2.Assistant
       log.info("last assistant", { id: lastAssistant?.id })
-      if (lastAssistant?.finish && lastAssistant.finish !== "tool-calls" && lastUser.id < lastAssistant.id) {
-        break
-      }
-
+      if (lastAssistant?.finish && lastAssistant.finish !== "tool-calls" && lastUser.id < lastAssistant.id) break
       step++
+
       const model = await Provider.getModel(lastUser.model.providerID, lastUser.model.modelID)
       msgs = await checkOverflow({
         sessionID,
@@ -393,9 +457,30 @@ export namespace SessionPrompt {
       })
       const result = await processor.process(stream)
       if (result.blocked) break
+      if (result.info.error?.name === "APIError" && result.info.error.data.isRetryable) {
+        retries++
+        const delay = SessionRetry.getRetryDelayInMs(result.info.error, retries)
+        if (!delay) break
+        setStatus({
+          sessionID,
+          status: {
+            type: "retry",
+            attempt: retries,
+            message: result.info.error.data.message,
+          },
+        })
+        await SessionRetry.sleep(delay, abort).catch(() => {})
+        setStatus({
+          sessionID,
+          status: {
+            type: "busy",
+          },
+        })
+        continue
+      }
+      retries = 0
       if (result.info.error) break
     }
-
     SessionCompaction.prune({ sessionID })
     for await (const item of MessageV2.stream(sessionID)) {
       if (item.info.role === "user") continue
@@ -407,11 +492,6 @@ export namespace SessionPrompt {
       return item
     }
     throw new Error("Impossible")
-  }
-
-  async function getMessages(input: { sessionID: string; signal: AbortSignal }) {
-    const msgs = await MessageV2.filterCompacted(MessageV2.stream(input.sessionID))
-    return msgs
   }
 
   async function checkOverflow(input: {
@@ -1702,6 +1782,7 @@ export namespace SessionPrompt {
     return result
   }
 
+  // TODO: wire this back up
   async function ensureTitle(input: {
     session: Session.Info
     message: MessageV2.WithParts

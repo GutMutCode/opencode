@@ -317,6 +317,28 @@ export namespace Server {
         },
       )
       .get(
+        "/session/status",
+        describeRoute({
+          description: "Get session status",
+          operationId: "session.status",
+          responses: {
+            200: {
+              description: "Get session status",
+              content: {
+                "application/json": {
+                  schema: resolver(z.record(z.string(), SessionPrompt.Status)),
+                },
+              },
+            },
+            ...errors(400),
+          },
+        }),
+        async (c) => {
+          const result = SessionPrompt.status()
+          return c.json(result)
+        },
+      )
+      .get(
         "/session/:id",
         describeRoute({
           description: "Get session",
@@ -586,7 +608,8 @@ export namespace Server {
           }),
         ),
         async (c) => {
-          return c.json(SessionLock.abort(c.req.valid("param").id))
+          SessionPrompt.cancel(c.req.valid("param").id)
+          return c.json(true)
         },
       )
       .post(

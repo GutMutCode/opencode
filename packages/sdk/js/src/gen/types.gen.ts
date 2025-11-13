@@ -564,6 +564,17 @@ export type Session = {
   }
 }
 
+export type SessionStatus =
+  | {
+      type: "idle"
+    }
+  | {
+      type: "retry"
+    }
+  | {
+      type: "busy"
+    }
+
 export type NotFoundError = {
   name: "NotFoundError"
   data: {
@@ -601,6 +612,15 @@ export type UserMessage = {
     title?: string
     body?: string
     diffs: Array<FileDiff>
+  }
+  agent: string
+  model: {
+    providerID: string
+    modelID: string
+  }
+  system?: string
+  tools?: {
+    [key: string]: boolean
   }
 }
 
@@ -674,6 +694,7 @@ export type AssistantMessage = {
       write: number
     }
   }
+  finish?: string
 }
 
 export type Message = UserMessage | AssistantMessage
@@ -1279,6 +1300,14 @@ export type EventCommandExecuted = {
   }
 }
 
+export type EventSessionStatus = {
+  type: "session.status"
+  properties: {
+    sessionID: string
+    status: SessionStatus
+  }
+}
+
 export type EventSessionIdle = {
   type: "session.idle"
   properties: {
@@ -1352,6 +1381,7 @@ export type Event =
   | EventFileEdited
   | EventTodoUpdated
   | EventCommandExecuted
+  | EventSessionStatus
   | EventSessionIdle
   | EventSessionCreated
   | EventSessionUpdated
@@ -1566,6 +1596,35 @@ export type SessionCreateResponses = {
 }
 
 export type SessionCreateResponse = SessionCreateResponses[keyof SessionCreateResponses]
+
+export type SessionStatusData = {
+  body?: never
+  path?: never
+  query?: {
+    directory?: string
+  }
+  url: "/session/status"
+}
+
+export type SessionStatusErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type SessionStatusError = SessionStatusErrors[keyof SessionStatusErrors]
+
+export type SessionStatusResponses = {
+  /**
+   * Get session status
+   */
+  200: {
+    [key: string]: SessionStatus
+  }
+}
+
+export type SessionStatusResponse = SessionStatusResponses[keyof SessionStatusResponses]
 
 export type SessionDeleteData = {
   body?: never

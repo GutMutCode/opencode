@@ -11,6 +11,7 @@ import type {
   LspStatus,
   McpStatus,
   FormatterStatus,
+  SessionStatus,
 } from "@opencode-ai/sdk"
 import { createStore, produce, reconcile } from "solid-js/store"
 import { useSDK } from "@tui/context/sdk"
@@ -31,6 +32,9 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
       }
       config: Config
       session: Session[]
+      session_status: {
+        [sessionID: string]: SessionStatus
+      }
       session_diff: {
         [sessionID: string]: Snapshot.FileDiff[]
       }
@@ -56,6 +60,7 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
       command: [],
       provider: [],
       session: [],
+      session_status: {},
       session_diff: {},
       todo: {},
       message: {},
@@ -138,6 +143,12 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
             }),
           )
           break
+
+        case "session.status": {
+          setStore("session_status", event.properties.sessionID, event.properties.status)
+          break
+        }
+
         case "message.updated": {
           const messages = store.message[event.properties.info.sessionID]
           if (!messages) {
@@ -234,6 +245,7 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
         sdk.client.lsp.status().then((x) => setStore("lsp", x.data!)),
         sdk.client.mcp.status().then((x) => setStore("mcp", x.data!)),
         sdk.client.formatter.status().then((x) => setStore("formatter", x.data!)),
+        sdk.client.session.status().then((x) => setStore("session_status", x.data!)),
       ]).then(() => {
         setStore("status", "complete")
       })

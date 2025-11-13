@@ -17,7 +17,7 @@ import { useRoute, useRouteData } from "@tui/context/route"
 import { useSync } from "@tui/context/sync"
 import { SplitBorder } from "@tui/component/border"
 import { useTheme } from "@tui/context/theme"
-import { BoxRenderable, ScrollBoxRenderable, TextAttributes, addDefaultParsers } from "@opentui/core"
+import { BoxRenderable, ScrollBoxRenderable, addDefaultParsers } from "@opentui/core"
 import { Prompt, type PromptRef } from "@tui/component/prompt"
 import type { AssistantMessage, Part, ToolPart, UserMessage, TextPart, ReasoningPart } from "@opencode-ai/sdk"
 import { useLocal } from "@tui/context/local"
@@ -58,7 +58,6 @@ import { Editor } from "../../util/editor"
 import { Global } from "@/global"
 import fs from "fs/promises"
 import stripAnsi from "strip-ansi"
-import { LSP } from "@/lsp/index.ts"
 
 addDefaultParsers(parsers.parsers)
 
@@ -84,7 +83,12 @@ export function Session() {
   const permissions = createMemo(() => sync.data.permission[route.sessionID] ?? [])
 
   const pending = createMemo(() => {
-    return messages().findLast((x) => x.role === "assistant" && !x.time?.completed)?.id
+    return messages().findLast((x) => x.role === "assistant")?.id
+  })
+
+  const lastUserMessage = createMemo(() => {
+    const p = pending()
+    return messages().findLast((x) => x.role === "user" && (!p || x.id < p)) as UserMessage
   })
 
   const dimensions = useTerminalDimensions()
@@ -634,6 +638,13 @@ export function Session() {
   // snap to bottom when session changes
   createEffect(on(() => route.sessionID, toBottom))
 
+  const status = createMemo(
+    () =>
+      sync.data.session_status[route.sessionID] ?? {
+        type: "idle",
+      },
+  )
+
   return (
     <context.Provider
       value={{
@@ -781,6 +792,17 @@ export function Session() {
                 )}
               </For>
             </scrollbox>
+            <Show when={status().type !== "idle"}>
+              <box flexDirection="row" gap={1} flexShrink={0}>
+                <text fg={local.agent.color(lastUserMessage().agent)}>{Locale.titlecase(lastUserMessage().agent)}</text>
+                <Shimmer text={lastUserMessage().model.modelID} color={theme.text} />
+                <Show when={status().type === "retry"}>
+                  <text fg={theme.error}>
+                    {status().message} [retry #{status().attempt}]
+                  </text>
+                </Show>
+              </box>
+            </Show>
             <box flexShrink={0}>
               <Prompt
                 ref={(r) => (prompt = r)}
@@ -916,30 +938,6 @@ function AssistantMessage(props: { message: AssistantMessage; parts: Part[]; las
           borderColor={theme.error}
         >
           <text fg={theme.textMuted}>{props.message.error?.data.message}</text>
-        </box>
-      </Show>
-      <Show
-        when={
-          !props.message.time.completed ||
-          (props.last &&
-            (props.parts.some((item) => item.type === "step-finish" && item.reason === "tool-calls") ||
-              (props.message.error?.name === "APIError" && props.message.error.data.isRetryable)))
-        }
-      >
-        <box
-          paddingLeft={2}
-          marginTop={1}
-          flexDirection="row"
-          gap={1}
-          border={["left"]}
-          customBorderChars={SplitBorder.customBorderChars}
-          borderColor={theme.backgroundElement}
-        >
-          <text fg={local.agent.color(props.message.mode)}>{Locale.titlecase(props.message.mode)}</text>
-          <Shimmer text={`${props.message.modelID}`} color={theme.text} />
-          <Show when={props.message.error && props.message.error.name === "APIError"}>
-            <text fg={theme.error}>{props.message.error!.data.message as string} [retrying]</text>
-          </Show>
         </box>
       </Show>
       <Show
