@@ -589,7 +589,7 @@ export namespace MessageV2 {
           if (part.type === "subtask") {
             userMessage.parts.push({
               type: "text",
-              text: `Running subtask ${part.agent}: ${part.description}`,
+              text: "The following tool was executed by the user",
             })
           }
         }
