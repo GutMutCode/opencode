@@ -133,9 +133,53 @@ const AgentCreateCommand = cmd({
   },
 })
 
+const AgentListCommand = cmd({
+  command: "list",
+  describe: "list all available agents",
+  aliases: ["ls"],
+  async handler() {
+    await Instance.provide({
+      directory: process.cwd(),
+      async fn() {
+        UI.empty()
+        prompts.intro("Available agents")
+
+        const agents = await Agent.list()
+
+        if (agents.length === 0) {
+          prompts.log.warn("No agents found")
+          prompts.outro("Done")
+          return
+        }
+
+        const sortedAgents = agents.sort((a, b) => {
+          if (a.builtIn !== b.builtIn) {
+            return a.builtIn ? -1 : 1
+          }
+          return a.name.localeCompare(b.name)
+        })
+
+        for (const agent of sortedAgents) {
+          const type = agent.builtIn ? "built-in" : "custom"
+          const mode = agent.mode === "all" ? "primary/subagent" : agent.mode
+          const description = agent.description || "No description"
+
+          prompts.log.info(`${agent.name} (${type}, ${mode})`)
+          if (description) {
+            console.log(`  ${description}`)
+          }
+          console.log()
+        }
+
+        prompts.outro(`Found ${agents.length} agent${agents.length === 1 ? "" : "s"}`)
+      },
+    })
+  },
+})
+
 export const AgentCommand = cmd({
   command: "agent",
   describe: "manage agents",
-  builder: (yargs) => yargs.command(AgentCreateCommand).demandCommand(),
+  builder: (yargs) => yargs.command(AgentCreateCommand).command(AgentListCommand).demandCommand(),
   async handler() {},
 })
