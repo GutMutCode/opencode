@@ -136,7 +136,6 @@ const AgentCreateCommand = cmd({
 const AgentListCommand = cmd({
   command: "list",
   describe: "list all available agents",
-  aliases: ["ls"],
   async handler() {
     await Instance.provide({
       directory: process.cwd(),
