@@ -102,6 +102,7 @@ export namespace ShareNext {
 
   async function fullSync(sessionID: string) {
     const session = await Session.get(sessionID)
+    const diffs = await Session.diff(sessionID)
     const messages = await Array.fromAsync(MessageV2.stream(sessionID))
     await sync(sessionID, [
       {
@@ -113,6 +114,10 @@ export namespace ShareNext {
         data: x.info,
       })),
       ...messages.flatMap((x) => x.parts.map((y) => ({ type: "part" as const, data: y }))),
+      {
+        type: "session_diff",
+        data: diffs,
+      },
     ])
   }
 }
