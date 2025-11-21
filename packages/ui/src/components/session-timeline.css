@@ -214,6 +214,14 @@
     width: 100%;
   }
 
+  [data-component="sticky-accordion-header"] {
+    top: 40px;
+
+    &[data-expanded]::before {
+      top: -40px;
+    }
+  }
+
   [data-slot="session-timeline-accordion-trigger-content"] {
     display: flex;
     align-items: center;

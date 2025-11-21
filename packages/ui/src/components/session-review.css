@@ -1,7 +1,7 @@
 [data-component="session-review"] {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
   height: 100%;
   overflow-y: auto;
   scrollbar-width: none;
@@ -39,10 +39,10 @@
   }
 
   [data-component="sticky-accordion-header"] {
-    top: 44px;
+    top: 40px;
 
     &[data-expanded]::before {
-      top: -44px;
+      top: -40px;
     }
   }
 

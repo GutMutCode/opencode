@@ -1,6 +1,6 @@
 [data-component="sticky-accordion-header"] {
   position: sticky;
-  top: 0;
+  top: 0px;
 
   &[data-expanded] {
     z-index: 10;
