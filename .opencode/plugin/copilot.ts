@@ -309,10 +309,12 @@ export async function CopilotAuthPlugin({ client }) {
 
             // Parse Responses API format
             const isStream = response.headers.get("content-type")?.includes("text/event-stream")
+            const logFile = `copilot-${Math.random().toString(36).slice(2)}-${Date.now()}.log`
 
             if (!isStream) {
               const json = await response.json()
               const converted = fromOpenaiResponse(json)
+              await Bun.write(logFile, JSON.stringify({ type: "non-stream", raw: json, converted }, null, 2))
               return new Response(JSON.stringify(converted), {
                 status: response.status,
                 statusText: response.statusText,
@@ -332,10 +334,12 @@ export async function CopilotAuthPlugin({ client }) {
                 const decoder = new TextDecoder()
                 const encoder = new TextEncoder()
                 let buffer = ""
+                const chunks: { raw: string; converted: any }[] = []
 
                 while (true) {
                   const { done, value } = await reader.read()
                   if (done) {
+                    await Bun.write(logFile, JSON.stringify({ type: "stream", chunks }, null, 2))
                     controller.close()
                     return
                   }
@@ -349,6 +353,7 @@ export async function CopilotAuthPlugin({ client }) {
                     if (!trimmed) continue
 
                     const converted = fromOpenaiChunk(trimmed)
+                    chunks.push({ raw: trimmed, converted })
                     if (typeof converted === "string") {
                       controller.enqueue(encoder.encode(converted + "\n\n"))
                     } else {

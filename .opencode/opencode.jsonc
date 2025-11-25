@@ -11,9 +11,9 @@
       },
     },
     "github-copilot": {
-      // "api": "https://webhook.site/a289ee4e-6909-4830-8d20-8b434d3de1c4",
+      // "api": "https://webhook.site/2e127807-907e-44ac-909c-7917d03da356",
       "options": {
-        // "baseURL": "https://webhook.site/a289ee4e-6909-4830-8d20-8b434d3de1c4",
+        // "baseURL": "https://webhook.site/2e127807-907e-44ac-909c-7917d03da356",
       },
       "models": {
         "gpt-5.1-codex": {
