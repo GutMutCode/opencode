@@ -1506,6 +1506,7 @@ ToolRegistry.register<typeof EditTool>({
               addedSignColor={theme.diffHighlightAdded}
               removedSignColor={theme.diffHighlightRemoved}
               lineNumberFg={theme.diffLineNumber}
+              lineNumberBg={theme.diffContextBg}
               addedLineNumberBg={theme.diffAddedLineNumberBg}
               removedLineNumberBg={theme.diffRemovedLineNumberBg}
             />
