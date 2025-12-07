@@ -89,10 +89,10 @@ export const BashTool = Tool.define("bash", async () => {
     parameters: z.object({
       command: z.string().describe("The command to execute"),
       timeout: z.number().describe("Optional timeout in milliseconds").optional(),
-      dir_path: z
+      workdir: z
         .string()
         .describe(
-          `The path of the directory to run the command in, defaults to ${Instance.directory}. Must be a directory that already exists`,
+          `The working directory to run the command in. Defaults to ${Instance.directory}. Use this instead of 'cd' commands.`,
         )
         .optional(),
       description: z
@@ -102,7 +102,7 @@ export const BashTool = Tool.define("bash", async () => {
         ),
     }),
     async execute(params, ctx) {
-      const cwd = params.dir_path || Instance.directory
+      const cwd = params.workdir || Instance.directory
       if (params.timeout !== undefined && params.timeout < 0) {
         throw new Error(`Invalid timeout value: ${params.timeout}. Timeout must be a positive number.`)
       }

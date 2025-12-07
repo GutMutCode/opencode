@@ -25,17 +25,20 @@ Usage notes:
   - VERY IMPORTANT: You MUST avoid using search commands like `find` and `grep`. Instead use Grep, Glob, or Task to search. You MUST avoid read tools like `cat`, `head`, `tail`, and `ls`, and use Read and List to read files.
   - If you _still_ need to run `grep`, STOP. ALWAYS USE ripgrep at `rg` (or /usr/bin/rg) first, which all opencode users have pre-installed.
   - When issuing multiple commands, use the ';' or '&&' operator to separate them. DO NOT use newlines (newlines are ok in quoted strings).
-  - Avoid using `cd` to change directories when possible. Instead, set the `workdir` parameter or use absolute paths in your commands.
-    <good-example>
-    dir_path="/foo/bar", command="pytest tests"
-    </good-example>
-    <good-example>
-    pytest /foo/bar/tests
-    </good-example>
-    <bad-example>
-    cd /foo/bar && pytest tests
-    </bad-example>
 
+# Working Directory
+
+The `workdir` parameter sets the working directory for command execution. Prefer using `workdir` over `cd <dir> &&` command chains when you simply need to run a command in a different directory.
+
+<good-example>
+workdir="/foo/bar", command="pytest tests"
+</good-example>
+<good-example>
+command="pytest /foo/bar/tests"
+</good-example>
+<bad-example>
+command="cd /foo/bar && pytest tests"
+</bad-example>
 
 # Committing changes with git
 
