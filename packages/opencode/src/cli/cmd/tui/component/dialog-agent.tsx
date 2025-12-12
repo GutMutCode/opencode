@@ -12,7 +12,7 @@ export function DialogAgent() {
       return {
         value: item.name,
         title: item.name,
-        description: item.internal ? "native" : item.description,
+        description: item.native ? "native" : item.description,
       }
     }),
   )
