@@ -12,6 +12,7 @@ import { SessionStatus } from "./status"
 import { Plugin } from "@/plugin"
 import type { Provider } from "@/provider/provider"
 import { LLM } from "./llm"
+import { Config } from "@/config/config"
 
 export namespace SessionProcessor {
   const DOOM_LOOP_THRESHOLD = 3
@@ -40,6 +41,7 @@ export namespace SessionProcessor {
       },
       async process(streamInput: LLM.StreamInput) {
         log.info("process")
+        const shouldBreak = (await Config.get()).experimental?.continue_loop_on_deny !== true
         while (true) {
           try {
             let currentText: MessageV2.TextPart | undefined
@@ -219,7 +221,7 @@ export namespace SessionProcessor {
                     })
 
                     if (value.error instanceof Permission.RejectedError) {
-                      blocked = true
+                      blocked = shouldBreak
                     }
                     delete toolcalls[value.toolCallId]
                   }
