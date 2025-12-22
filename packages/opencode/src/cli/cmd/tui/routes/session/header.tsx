@@ -46,7 +46,7 @@ export function Header() {
           // borderColor={theme.border}
           flexShrink={0}
           flexGrow={1}
-          backgroundColor={theme.backgroundPanel}
+          backgroundColor={theme.backgroundElement}
         >
           <Switch>
             <Match when={session()?.parentID}>
