@@ -87,6 +87,7 @@ export default function Layout(props: ParentProps) {
   let scrollContainerRef: HTMLDivElement | undefined
   const xlQuery = window.matchMedia("(min-width: 1280px)")
   const [isLargeViewport, setIsLargeViewport] = createSignal(xlQuery.matches)
+  const [helpDropdownWidth, setHelpDropdownWidth] = createSignal<number | undefined>(undefined)
   const handleViewportChange = (e: MediaQueryListEvent) => setIsLargeViewport(e.matches)
   xlQuery.addEventListener("change", handleViewportChange)
   onCleanup(() => xlQuery.removeEventListener("change", handleViewportChange))
@@ -1936,16 +1937,30 @@ export default function Layout(props: ParentProps) {
             <Tooltip placement={sidebarProps.mobile ? "bottom" : "right"} value="Settings" class="hidden">
               <IconButton disabled icon="settings-gear" variant="ghost" size="large" />
             </Tooltip>
-            <DropdownMenu placement={layout.shortcuts.opened() ? "top-start" : "bottom-start"}>
+            <DropdownMenu
+              placement="top-start"
+              gutter={8}
+              onOpenChange={(open) => {
+                if (open && layout.sidebar.opened()) {
+                  setHelpDropdownWidth(layout.sidebar.width() - 16)
+                  return
+                }
+                if (!open) setHelpDropdownWidth(undefined)
+              }}
+            >
               <Tooltip placement={sidebarProps.mobile ? "bottom" : "right"} value="Help">
                 <DropdownMenu.Trigger as={IconButton} icon="question-mark" variant="ghost" size="large" />
               </Tooltip>
               <DropdownMenu.Portal>
-                <DropdownMenu.Content>
+                <DropdownMenu.Content
+                  style={{
+                    width: helpDropdownWidth() ? `${helpDropdownWidth()}px` : undefined,
+                  }}
+                >
                   <DropdownMenu.Item onSelect={() => platform.openLink("https://opencode.ai/desktop-feedback")}>
                     Submit feedback
                   </DropdownMenu.Item>
-                  <DropdownMenu.Item class="flex justify-between gap-6" onSelect={() => layout.shortcuts.open()}>
+                  <DropdownMenu.Item class="flex justify-between gap-6" onSelect={() => layout.shortcuts.toggle()}>
                     Keyboard shortcuts <span class="text-text-weaker">{formatKeybind("ctrl+/")}</span>
                   </DropdownMenu.Item>
                 </DropdownMenu.Content>
