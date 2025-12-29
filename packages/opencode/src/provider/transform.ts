@@ -3,6 +3,7 @@ import { unique } from "remeda"
 import type { JSONSchema } from "zod/v4/core"
 import type { Provider } from "./provider"
 import type { ModelsDev } from "./models"
+import type { MessageV2 } from "@/session/message-v2"
 
 type Modality = NonNullable<ModelsDev.Model["modalities"]>["input"][number]
 
@@ -124,7 +125,7 @@ export namespace ProviderTransform {
         cacheControl: { type: "ephemeral" },
       },
       openrouter: {
-        cache_control: { type: "ephemeral" },
+        cacheControl: { type: "ephemeral" },
       },
       bedrock: {
         cachePoint: { type: "ephemeral" },
