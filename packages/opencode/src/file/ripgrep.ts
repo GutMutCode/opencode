@@ -372,7 +372,7 @@ export namespace Ripgrep {
 
     if (input.glob) {
       for (const g of input.glob) {
-        args.push(`--glob=${g}`)
+        args.push(`--glob='${g}'`)
       }
     }
 
