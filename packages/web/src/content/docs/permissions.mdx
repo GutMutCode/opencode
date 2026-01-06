@@ -45,7 +45,7 @@ You can also set all permissions at once:
 
 ---
 
-## Granular Rules (Object Syntax)
+## Granular rules
 
 For most permissions, you can use an object to apply different actions based on the tool input.
 
@@ -67,9 +67,47 @@ For most permissions, you can use an object to apply different actions based on 
 }
 ```
 
-Rules are evaluated by pattern match, with the **last matching rule winning**. A common pattern is to put the catch-all `"*"` rule first, and more specific rules after it.
+---
 
-### Wildcards
+## Order matters
+
+:::caution
+Rules are evaluated in declaration order and **the last matching rule wins**. Put your catch-all `"*"` rule first, and specific patterns last.
+:::
+
+This is a common mistake:
+
+```json title="opencode.json"
+{
+  "permission": {
+    "bash": {
+      "rm *": "deny",
+      "*": "allow"
+    }
+  }
+}
+```
+
+Here `rm foo` matches both `"rm *"` and `"*"`. Since `"*": "allow"` comes last, it wins — and the command runs. This is probably not what you want.
+
+Put the catch-all first:
+
+```json title="opencode.json"
+{
+  "permission": {
+    "bash": {
+      "*": "allow",
+      "rm *": "deny"
+    }
+  }
+}
+```
+
+Now `rm foo` is denied because `"rm *": "deny"` is the last matching rule.
+
+---
+
+## Wildcards
 
 Permission patterns use simple wildcard matching:
 
