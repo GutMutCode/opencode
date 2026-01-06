@@ -89,7 +89,9 @@ export function Prompt(props: PromptProps) {
   const fileStyleId = syntax().getStyleId("extmark.file")!
   const agentStyleId = syntax().getStyleId("extmark.agent")!
   const pasteStyleId = syntax().getStyleId("extmark.paste")!
+  const commandStyleId = syntax().getStyleId("extmark.command")!
   let promptPartTypeId: number
+  let commandHighlightRef = 0
 
   sdk.event.on(TuiEvent.PromptAppend.type, (evt) => {
     input.insertText(evt.properties.text)
@@ -395,6 +397,25 @@ export function Prompt(props: PromptProps) {
         draft.prompt.parts = newParts
       }),
     )
+  }
+
+  function highlightSlashCommands() {
+    // Remove previous command highlights
+    input.removeHighlightsByRef(commandHighlightRef)
+    commandHighlightRef++
+
+    const text = input.plainText
+    // Match all slash commands (e.g. /help, /status, /compact)
+    const regex = /\/[a-zA-Z_][a-zA-Z0-9_-]*/g
+    let match: RegExpExecArray | null
+    while ((match = regex.exec(text)) !== null) {
+      input.addHighlightByCharRange({
+        start: match.index,
+        end: match.index + match[0].length,
+        styleId: commandStyleId,
+        hlRef: commandHighlightRef,
+      })
+    }
   }
 
   command.register(() => [
@@ -772,6 +793,7 @@ export function Prompt(props: PromptProps) {
                 setStore("prompt", "input", value)
                 autocomplete.onInput(value)
                 syncExtmarksWithPromptParts()
+                highlightSlashCommands()
               }}
               keyBindings={textareaKeybindings()}
               onKeyDown={async (e) => {
