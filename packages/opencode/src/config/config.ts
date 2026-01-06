@@ -478,6 +478,7 @@ export namespace Config {
         .optional()
         .describe("Maximum number of agentic iterations before forcing text-only response"),
       maxSteps: z.number().int().positive().optional().describe("@deprecated Use 'steps' field instead."),
+      variant: z.string().optional().describe("Default model variant for this agent (e.g., 'high', 'low', 'max')"),
       permission: Permission.optional(),
     })
     .catchall(z.any())
@@ -493,6 +494,7 @@ export namespace Config {
         "color",
         "steps",
         "maxSteps",
+        "variant",
         "options",
         "permission",
         "disable",

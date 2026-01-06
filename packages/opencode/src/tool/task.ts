@@ -132,6 +132,7 @@ export const TaskTool = Tool.define("task", async () => {
           providerID: model.providerID,
         },
         agent: agent.name,
+        variant: agent.variant,
         tools: {
           todowrite: false,
           todoread: false,

@@ -34,6 +34,7 @@ export namespace Agent {
       prompt: z.string().optional(),
       options: z.record(z.string(), z.any()),
       steps: z.number().int().positive().optional(),
+      variant: z.string().optional(),
     })
     .meta({
       ref: "Agent",
@@ -190,6 +191,7 @@ export namespace Agent {
       item.color = value.color ?? item.color
       item.name = value.name ?? item.name
       item.steps = value.steps ?? item.steps
+      item.variant = value.variant ?? item.variant
       item.options = mergeDeep(item.options, value.options ?? {})
       item.permission = PermissionNext.merge(item.permission, PermissionNext.fromConfig(value.permission ?? {}))
     }
