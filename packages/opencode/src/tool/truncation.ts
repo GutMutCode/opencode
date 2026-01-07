@@ -81,7 +81,7 @@ export namespace Truncate {
     }
 
     const removed = hitBytes ? totalBytes - bytes : lines.length - out.length
-    const unit = hitBytes ? "chars" : "lines"
+    const unit = hitBytes ? "bytes" : "lines"
     const preview = out.join("\n")
 
     await init()

@@ -73,7 +73,7 @@ describe("Truncate", () => {
       const result = await Truncate.output(content)
 
       expect(result.truncated).toBe(true)
-      expect(result.content).toContain("chars truncated...")
+      expect(result.content).toContain("bytes truncated...")
       expect(Buffer.byteLength(content, "utf-8")).toBeGreaterThan(Truncate.MAX_BYTES)
     })
 
