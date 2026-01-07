@@ -2,7 +2,6 @@ import { Bus } from "@/bus"
 import { BusEvent } from "@/bus/bus-event"
 import { Config } from "@/config/config"
 import { Identifier } from "@/id/id"
-import { Plugin } from "@/plugin"
 import { Instance } from "@/project/instance"
 import { Storage } from "@/storage/storage"
 import { fn } from "@/util/fn"
@@ -132,6 +131,7 @@ export namespace PermissionNext {
             id,
             ...request,
           }
+          const { Plugin } = await import("@/plugin")
           const hook = await Plugin.trigger(
             "permission.ask",
             {
