@@ -89,8 +89,9 @@ export namespace Truncate {
     const filepath = path.join(DIR, id)
     await Bun.write(Bun.file(filepath), text)
 
-    const base = `Full output written to: ${filepath}\nUse Grep to search the full content and Read with offset/limit to read specific sections`
-    const hint = hasTaskTool(agent) ? `${base} (or use Task tool to delegate and save context).` : `${base}.`
+    const hint = hasTaskTool(agent)
+      ? `Full output written to: ${filepath} (read-only)\nIMPORTANT: Use the Task tool to have a subagent process this file with Grep and Read (with offset/limit). Do NOT read the full file yourself - delegate to save context.`
+      : `Full output written to: ${filepath} (read-only)\nUse Grep to search the full content or Read with offset/limit to read specific sections.`
     const message =
       direction === "head"
         ? `${preview}\n\n...${removed} ${unit} truncated...\n\n${hint}`

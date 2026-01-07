@@ -114,6 +114,9 @@ export namespace Agent {
             websearch: "allow",
             codesearch: "allow",
             read: "allow",
+            external_directory: {
+              [Truncate.DIR]: "allow",
+            },
           }),
           user,
         ),
