@@ -1,6 +1,5 @@
 import type { Hooks, PluginInput } from "@opencode-ai/plugin"
 import { Log } from "../util/log"
-import { Installation } from "../installation"
 import { OAUTH_DUMMY_KEY } from "../auth"
 
 const log = Log.create({ service: "plugin.codex" })
@@ -256,13 +255,6 @@ function waitForOAuthCallback(pkce: PkceCodes, state: string): Promise<TokenResp
   })
 }
 
-function getUserAgent(): string {
-  const version = Installation.VERSION
-  const platform = process.platform
-  const arch = process.arch
-  return `opencode/${version} (${platform}; ${arch})`
-}
-
 export async function CodexAuthPlugin(input: PluginInput): Promise<Hooks> {
   return {
     auth: {
@@ -331,20 +323,8 @@ export async function CodexAuthPlugin(input: PluginInput): Promise<Hooks> {
               }
             }
 
-            // Set required Codex headers
+            // Set authorization header with access token
             headers.set("authorization", `Bearer ${currentAuth.access}`)
-            headers.set("originator", "opencode")
-            headers.set("user-agent", getUserAgent())
-
-            // Extract session_id from request body if present
-            let body = init?.body
-            if (body && typeof body === "string") {
-              const parsed = JSON.parse(body)
-              // The session ID should be passed in the request - we'll extract it from context
-              // For now, generate a UUIDv7-like ID based on timestamp
-              const sessionId = parsed.metadata?.sessionID || generateSessionId()
-              headers.set("session_id", sessionId)
-            }
 
             // Rewrite URL to Codex endpoint
             let url: URL
@@ -363,7 +343,6 @@ export async function CodexAuthPlugin(input: PluginInput): Promise<Hooks> {
 
             return fetch(url, {
               ...init,
-              body,
               headers,
             })
           },
@@ -401,16 +380,4 @@ export async function CodexAuthPlugin(input: PluginInput): Promise<Hooks> {
       ],
     },
   }
-}
-
-// Generate a UUIDv7-like session ID (timestamp-prefixed)
-function generateSessionId(): string {
-  const timestamp = Date.now()
-  const timestampHex = timestamp.toString(16).padStart(12, "0")
-  const randomHex = Array.from(crypto.getRandomValues(new Uint8Array(10)))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("")
-  // UUIDv7 format: xxxxxxxx-xxxx-7xxx-yxxx-xxxxxxxxxxxx
-  // First 48 bits are timestamp, version is 7
-  return `${timestampHex.slice(0, 8)}-${timestampHex.slice(8, 12)}-7${randomHex.slice(0, 3)}-${(0x80 | (parseInt(randomHex.slice(3, 4), 16) & 0x3f)).toString(16)}${randomHex.slice(4, 7)}-${randomHex.slice(7, 19)}`
 }

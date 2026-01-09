@@ -101,6 +101,7 @@ export namespace LLM {
     )
     if (isCodex) {
       options.instructions = SystemPrompt.instructions()
+      options.store = false
     }
 
     const params = await Plugin.trigger(
@@ -122,16 +123,14 @@ export namespace LLM {
       },
     )
 
-    l.info("params", {
-      params,
-    })
-
-    const maxOutputTokens = ProviderTransform.maxOutputTokens(
-      input.model.api.npm,
-      params.options,
-      input.model.limit.output,
-      OUTPUT_TOKEN_MAX,
-    )
+    const maxOutputTokens = isCodex
+      ? undefined
+      : ProviderTransform.maxOutputTokens(
+          input.model.api.npm,
+          params.options,
+          input.model.limit.output,
+          OUTPUT_TOKEN_MAX,
+        )
 
     const tools = await resolveTools(input)
 
