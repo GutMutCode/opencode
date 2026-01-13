@@ -66,7 +66,7 @@ export const PlanExitTool = Tool.define("plan_exit", {
 
     return {
       title: "Switching to build agent",
-      output: "User chose to continue planning. Wait for further instructions.",
+      output: "User approved switching to build agent. Wait for further instructions.",
       metadata: {},
     }
   },

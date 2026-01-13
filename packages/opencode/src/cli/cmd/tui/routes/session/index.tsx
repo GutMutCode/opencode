@@ -201,9 +201,7 @@ export function Session() {
     if (part.type !== "tool") return
     if (part.sessionID !== route.sessionID) return
     if (part.state.status !== "completed") return
-
-    const metadata = part.state.metadata as { switched?: boolean }
-    if (!metadata?.switched) return
+    if (part.id === lastSwitch) return
 
     if (part.tool === "plan_exit") {
       local.agent.set("build")
