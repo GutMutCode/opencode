@@ -53,6 +53,28 @@ export namespace Project {
     Updated: BusEvent.define("project.updated", Info),
   }
 
+  type Row = typeof ProjectTable.$inferSelect
+
+  export function fromRow(row: Row): Info {
+    const icon =
+      row.icon_url || row.icon_color
+        ? { url: row.icon_url ?? undefined, color: row.icon_color ?? undefined }
+        : undefined
+    return {
+      id: row.id,
+      worktree: row.worktree,
+      vcs: row.vcs as Info["vcs"],
+      name: row.name ?? undefined,
+      icon,
+      time: {
+        created: row.time_created,
+        updated: row.time_updated,
+        initialized: row.time_initialized ?? undefined,
+      },
+      sandboxes: row.sandboxes,
+    }
+  }
+
   export async function fromDirectory(directory: string) {
     log.info("fromDirectory", { directory })
 
@@ -179,9 +201,9 @@ export namespace Project {
     })
 
     const row = db().select().from(ProjectTable).where(eq(ProjectTable.id, id)).get()
-    let existing = row?.data
-    if (!existing) {
-      existing = {
+    const existing = await iife(async () => {
+      if (row) return fromRow(row)
+      const fresh: Info = {
         id,
         worktree,
         vcs: vcs as Info["vcs"],
@@ -194,10 +216,8 @@ export namespace Project {
       if (id !== "global") {
         await migrateFromGlobal(id, worktree)
       }
-    }
-
-    // migrate old projects before sandboxes
-    if (!existing.sandboxes) existing.sandboxes = []
+      return fresh
+    })
 
     if (Flag.OPENCODE_EXPERIMENTAL_ICON_DISCOVERY) discover(existing)
 
@@ -212,11 +232,29 @@ export namespace Project {
     }
     if (sandbox !== result.worktree && !result.sandboxes.includes(sandbox)) result.sandboxes.push(sandbox)
     result.sandboxes = result.sandboxes.filter((x) => existsSync(x))
-    db()
-      .insert(ProjectTable)
-      .values({ id, data: result })
-      .onConflictDoUpdate({ target: ProjectTable.id, set: { data: result } })
-      .run()
+    const insert = {
+      id: result.id,
+      worktree: result.worktree,
+      vcs: result.vcs,
+      name: result.name,
+      icon_url: result.icon?.url,
+      icon_color: result.icon?.color,
+      time_created: result.time.created,
+      time_updated: result.time.updated,
+      time_initialized: result.time.initialized,
+      sandboxes: result.sandboxes,
+    }
+    const update = {
+      worktree: result.worktree,
+      vcs: result.vcs,
+      name: result.name,
+      icon_url: result.icon?.url,
+      icon_color: result.icon?.color,
+      time_updated: result.time.updated,
+      time_initialized: result.time.initialized,
+      sandboxes: result.sandboxes,
+    }
+    db().insert(ProjectTable).values(insert).onConflictDoUpdate({ target: ProjectTable.id, set: update }).run()
     GlobalBus.emit("event", {
       payload: {
         type: Event.Updated.type,
@@ -283,10 +321,13 @@ export namespace Project {
   }
 
   export function setInitialized(projectID: string) {
-    const row = db().select().from(ProjectTable).where(eq(ProjectTable.id, projectID)).get()
-    if (!row) return
-    const data = { ...row.data, time: { ...row.data.time, initialized: Date.now() } }
-    db().update(ProjectTable).set({ data }).where(eq(ProjectTable.id, projectID)).run()
+    db()
+      .update(ProjectTable)
+      .set({
+        time_initialized: Date.now(),
+      })
+      .where(eq(ProjectTable.id, projectID))
+      .run()
   }
 
   export function list() {
@@ -294,7 +335,7 @@ export namespace Project {
       .select()
       .from(ProjectTable)
       .all()
-      .map((row) => row.data)
+      .map((row) => fromRow(row))
   }
 
   export const update = fn(
@@ -305,24 +346,19 @@ export namespace Project {
       commands: Info.shape.commands.optional(),
     }),
     async (input) => {
-      const row = db().select().from(ProjectTable).where(eq(ProjectTable.id, input.projectID)).get()
-      if (!row) throw new Error(`Project not found: ${input.projectID}`)
-      const data = { ...row.data }
-      if (input.name !== undefined) data.name = input.name
-      if (input.icon !== undefined) {
-        data.icon = { ...data.icon }
-        if (input.icon.url !== undefined) data.icon.url = input.icon.url
-        if (input.icon.override !== undefined) data.icon.override = input.icon.override || undefined
-        if (input.icon.color !== undefined) data.icon.color = input.icon.color
-      }
-      if (input.commands?.start !== undefined) {
-        const start = input.commands.start || undefined
-        data.commands = { ...(data.commands ?? {}) }
-        data.commands.start = start
-        if (!data.commands.start) data.commands = undefined
-      }
-      data.time.updated = Date.now()
-      db().update(ProjectTable).set({ data }).where(eq(ProjectTable.id, input.projectID)).run()
+      const result = db()
+        .update(ProjectTable)
+        .set({
+          name: input.name,
+          icon_url: input.icon?.url,
+          icon_color: input.icon?.color,
+          time_updated: Date.now(),
+        })
+        .where(eq(ProjectTable.id, input.projectID))
+        .returning()
+        .get()
+      if (!result) throw new Error(`Project not found: ${input.projectID}`)
+      const data = fromRow(result)
       GlobalBus.emit("event", {
         payload: {
           type: Event.Updated.type,
@@ -335,9 +371,10 @@ export namespace Project {
 
   export async function sandboxes(projectID: string) {
     const row = db().select().from(ProjectTable).where(eq(ProjectTable.id, projectID)).get()
-    if (!row?.data.sandboxes) return []
+    if (!row) return []
+    const data = fromRow(row)
     const valid: string[] = []
-    for (const dir of row.data.sandboxes) {
+    for (const dir of data.sandboxes) {
       const stat = await fs.stat(dir).catch(() => undefined)
       if (stat?.isDirectory()) valid.push(dir)
     }
@@ -347,12 +384,16 @@ export namespace Project {
   export async function addSandbox(projectID: string, directory: string) {
     const row = db().select().from(ProjectTable).where(eq(ProjectTable.id, projectID)).get()
     if (!row) throw new Error(`Project not found: ${projectID}`)
-    const data = { ...row.data }
-    const sandboxes = data.sandboxes ?? []
+    const sandboxes = row.sandboxes ?? []
     if (!sandboxes.includes(directory)) sandboxes.push(directory)
-    data.sandboxes = sandboxes
-    data.time.updated = Date.now()
-    db().update(ProjectTable).set({ data }).where(eq(ProjectTable.id, projectID)).run()
+    const result = db()
+      .update(ProjectTable)
+      .set({ sandboxes, time_updated: Date.now() })
+      .where(eq(ProjectTable.id, projectID))
+      .returning()
+      .get()
+    if (!result) throw new Error(`Project not found: ${projectID}`)
+    const data = fromRow(result)
     GlobalBus.emit("event", {
       payload: {
         type: Event.Updated.type,
@@ -365,11 +406,15 @@ export namespace Project {
   export async function removeSandbox(projectID: string, directory: string) {
     const row = db().select().from(ProjectTable).where(eq(ProjectTable.id, projectID)).get()
     if (!row) throw new Error(`Project not found: ${projectID}`)
-    const data = { ...row.data }
-    const sandboxes = data.sandboxes ?? []
-    data.sandboxes = sandboxes.filter((sandbox) => sandbox !== directory)
-    data.time.updated = Date.now()
-    db().update(ProjectTable).set({ data }).where(eq(ProjectTable.id, projectID)).run()
+    const sandboxes = (row.sandboxes ?? []).filter((s) => s !== directory)
+    const result = db()
+      .update(ProjectTable)
+      .set({ sandboxes, time_updated: Date.now() })
+      .where(eq(ProjectTable.id, projectID))
+      .returning()
+      .get()
+    if (!result) throw new Error(`Project not found: ${projectID}`)
+    const data = fromRow(result)
     GlobalBus.emit("event", {
       payload: {
         type: Event.Updated.type,
