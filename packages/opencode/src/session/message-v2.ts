@@ -516,7 +516,7 @@ export namespace MessageV2 {
                 toolCallId: part.callID,
                 input: part.state.input,
                 output: part.state.time.compacted
-                  ? "[Old tool result content cleared]"
+                  ? { output: "[Old tool result content cleared]", attachments: undefined }
                   : { output: part.state.output, attachments: part.state.attachments },
                 callProviderMetadata: part.metadata,
               })
