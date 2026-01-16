@@ -597,7 +597,7 @@ export namespace SessionPrompt {
         sessionID,
         system: [...(await SystemPrompt.environment()), ...(await SystemPrompt.custom())],
         messages: [
-          ...MessageV2.toModelMessage(sessionMessages, { tools }),
+          ...MessageV2.toModelMessage(sessionMessages),
           ...(isLastStep
             ? [
                 {
@@ -721,15 +721,8 @@ export namespace SessionPrompt {
           if (typeof result === "string") return { type: "text", value: result }
           if (!result.attachments?.length) return { type: "text", value: result.output }
           return {
-            type: "content",
-            value: [
-              { type: "text", text: result.output },
-              ...result.attachments.map((a) => ({
-                type: "media" as const,
-                data: a.url.slice(a.url.indexOf(",") + 1),
-                mediaType: a.mime,
-              })),
-            ],
+            type: "text",
+            value: result.output,
           }
         },
       })
@@ -821,15 +814,8 @@ export namespace SessionPrompt {
         if (typeof result === "string") return { type: "text", value: result }
         if (!result.attachments?.length) return { type: "text", value: result.output }
         return {
-          type: "content",
-          value: [
-            { type: "text", text: result.output },
-            ...result.attachments.map((a) => ({
-              type: "media" as const,
-              data: a.url.slice(a.url.indexOf(",") + 1),
-              mediaType: a.mime,
-            })),
-          ],
+          type: "text",
+          value: result.output,
         }
       }
       tools[key] = item
