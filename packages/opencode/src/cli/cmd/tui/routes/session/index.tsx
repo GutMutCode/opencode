@@ -39,7 +39,7 @@ import { TodoWriteTool } from "@/tool/todo"
 import type { GrepTool } from "@/tool/grep"
 import type { ListTool } from "@/tool/ls"
 import type { EditTool } from "@/tool/edit"
-import type { PatchTool } from "@/tool/patch"
+import type { ApplyPatchTool } from "@/tool/apply_patch.ts"
 import type { WebFetchTool } from "@/tool/webfetch"
 import type { TaskTool } from "@/tool/task"
 import type { QuestionTool } from "@/tool/question"
@@ -1835,7 +1835,7 @@ function Edit(props: ToolProps<typeof EditTool>) {
   )
 }
 
-function Patch(props: ToolProps<typeof PatchTool>) {
+function Patch(props: ToolProps<typeof ApplyPatchTool>) {
   const { theme } = useTheme()
   return (
     <Switch>
