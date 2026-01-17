@@ -16,33 +16,48 @@ function mimeToModality(mime: string): Modality | undefined {
 }
 
 export namespace ProviderTransform {
+  // Maps npm package to the key the AI SDK expects for providerOptions
+  function sdkKey(npm: string): string | undefined {
+    switch (npm) {
+      case "@ai-sdk/github-copilot":
+      case "@ai-sdk/openai":
+      case "@ai-sdk/azure":
+        return "openai"
+      case "@ai-sdk/amazon-bedrock":
+        return "bedrock"
+      case "@ai-sdk/anthropic":
+        return "anthropic"
+      case "@ai-sdk/google-vertex":
+      case "@ai-sdk/google":
+        return "google"
+      case "@ai-sdk/gateway":
+        return "gateway"
+      case "@openrouter/ai-sdk-provider":
+        return "openrouter"
+    }
+    return undefined
+  }
+
+  // Remaps providerOptions keys from stored providerID to expected SDK key
+  function remapProviderOptions(
+    opts: Record<string, any> | undefined,
+    providerID: string,
+    expected: string,
+  ): Record<string, any> | undefined {
+    if (!opts) return opts
+    if (providerID === expected) return opts
+    if (!(providerID in opts)) return opts
+    const result = { ...opts }
+    result[expected] = { ...result[expected], ...result[providerID] }
+    delete result[providerID]
+    return result
+  }
+
   function normalizeMessages(
     msgs: ModelMessage[],
     model: Provider.Model,
     options: Record<string, unknown>,
   ): ModelMessage[] {
-    // if (model.api.npm === "@ai-sdk/openai" || options.store === false) {
-    //   msgs = msgs.map((msg) => {
-    //     if (msg.providerOptions) {
-    //       for (const options of Object.values(msg.providerOptions)) {
-    //         delete options["itemId"]
-    //       }
-    //     }
-    //     if (!Array.isArray(msg.content)) {
-    //       return msg
-    //     }
-    //     const content = msg.content.map((part) => {
-    //       if (part.providerOptions) {
-    //         for (const options of Object.values(part.providerOptions)) {
-    //           delete options["itemId"]
-    //         }
-    //       }
-    //       return part
-    //     })
-    //     return { ...msg, content } as typeof msg
-    //   })
-    // }
-
     // Anthropic rejects messages with empty content - filter out empty string messages
     // and remove empty text/reasoning parts from array content
     if (model.api.npm === "@ai-sdk/anthropic") {
@@ -254,6 +269,22 @@ export namespace ProviderTransform {
       model.api.npm === "@ai-sdk/anthropic"
     ) {
       msgs = applyCaching(msgs, model.providerID)
+    }
+
+    // Remap providerOptions keys from stored providerID to expected SDK key
+    const expected = sdkKey(model.api.npm)
+    if (expected && expected !== model.providerID) {
+      msgs = msgs.map((msg) => {
+        msg = { ...msg, providerOptions: remapProviderOptions(msg.providerOptions, model.providerID, expected) }
+        if (!Array.isArray(msg.content)) return msg
+        return {
+          ...msg,
+          content: msg.content.map((part) => ({
+            ...part,
+            providerOptions: remapProviderOptions(part.providerOptions, model.providerID, expected),
+          })),
+        } as typeof msg
+      })
     }
 
     return msgs
@@ -573,39 +604,8 @@ export namespace ProviderTransform {
   }
 
   export function providerOptions(model: Provider.Model, options: { [x: string]: any }) {
-    switch (model.api.npm) {
-      case "@ai-sdk/github-copilot":
-      case "@ai-sdk/openai":
-      case "@ai-sdk/azure":
-        return {
-          ["openai" as string]: options,
-        }
-      case "@ai-sdk/amazon-bedrock":
-        return {
-          ["bedrock" as string]: options,
-        }
-      case "@ai-sdk/anthropic":
-        return {
-          ["anthropic" as string]: options,
-        }
-      case "@ai-sdk/google-vertex":
-      case "@ai-sdk/google":
-        return {
-          ["google" as string]: options,
-        }
-      case "@ai-sdk/gateway":
-        return {
-          ["gateway" as string]: options,
-        }
-      case "@openrouter/ai-sdk-provider":
-        return {
-          ["openrouter" as string]: options,
-        }
-      default:
-        return {
-          [model.providerID]: options,
-        }
-    }
+    const key = sdkKey(model.api.npm) ?? model.providerID
+    return { [key]: options }
   }
 
   export function maxOutputTokens(
