@@ -34,7 +34,7 @@ import { DiffChanges } from "@opencode-ai/ui/diff-changes"
 import { Spinner } from "@opencode-ai/ui/spinner"
 import { Dialog } from "@opencode-ai/ui/dialog"
 import { getFilename } from "@opencode-ai/util/path"
-import { Session, type Message, type TextPart } from "@opencode-ai/sdk/v2/client"
+import { Session, type Message, type TextPart, UserMessage } from "@opencode-ai/sdk/v2/client"
 import { usePlatform } from "@/context/platform"
 import { createStore, produce, reconcile } from "solid-js/store"
 import {
@@ -1352,7 +1352,7 @@ export default function Layout(props: ParentProps) {
     })
 
     const hoverMessages = createMemo(() =>
-      sessionStore.message[props.session.id]?.filter((message) => message.role === "user"),
+      sessionStore.message[props.session.id]?.filter((message) => message.role === "user") as UserMessage[],
     )
     const hoverReady = createMemo(() => sessionStore.message[props.session.id] !== undefined)
     const hoverAllowed = createMemo(() => !props.mobile && layout.sidebar.opened())
@@ -1425,8 +1425,8 @@ export default function Layout(props: ParentProps) {
             </Tooltip>
           }
         >
-          <HoverCard openDelay={150} closeDelay={100} placement="right" gutter={12} trigger={item}>
-            <Show when={hoverReady()} fallback={<div class="text-12-regular text-text-weak">Loading messages…</div>}>
+          <HoverCard openDelay={150} closeDelay={100} placement="right" gutter={28} trigger={item}>
+            <Show when={hoverReady()} fallback={<div>Loading messages…</div>}>
               <MessageNav
                 messages={hoverMessages() ?? []}
                 current={undefined}
@@ -1822,7 +1822,7 @@ export default function Layout(props: ParentProps) {
         class="size-full flex flex-col py-2 overflow-y-auto no-scrollbar"
         style={{ "overflow-anchor": "none" }}
       >
-        <nav class="flex flex-col gap-1 px-2">
+        <nav class="flex flex-col gap-2 px-2">
           <Show when={loading()}>
             <SessionSkeleton />
           </Show>

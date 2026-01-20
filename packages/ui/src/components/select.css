@@ -1,6 +1,9 @@
 [data-component="select"] {
   [data-slot="select-select-trigger"] {
-    padding: 0 4px 0 8px;
+    display: flex;
+    padding: 4px 8px !important;
+    align-items: center;
+    justify-content: space-between;
     box-shadow: none;
     transition: background-color 200ms cubic-bezier(0.25, 0, 0.5, 1);
 

@@ -1180,7 +1180,7 @@ export default function Page() {
                           if (isDesktop()) scheduleScrollSpy(e.currentTarget)
                         }}
                         onClick={autoScroll.handleInteraction}
-                        class="relative min-w-0 w-full h-full overflow-y-auto no-scrollbar snap-y snap-mandatory"
+                        class="relative min-w-0 w-full h-full overflow-y-auto no-scrollbar snap-both snap-mandatory"
                         style={{ "--session-title-height": info()?.title ? "40px" : "0px" }}
                       >
                         <Show when={info()?.title}>
@@ -1252,7 +1252,7 @@ export default function Page() {
                                   id={anchor(message.id)}
                                   data-message-id={message.id}
                                   classList={{
-                                    "min-w-0 w-full max-w-full snap-start": true,
+                                    "min-w-0 w-full max-w-full snap-both": true,
                                     "md:max-w-200": !showTabs(),
                                     "last:min-h-[calc(100vh-5.5rem-var(--prompt-height,8rem)-64px)] md:last:min-h-[calc(100vh-4.5rem-var(--prompt-height,10rem)-64px)]":
                                       platform.platform !== "desktop",

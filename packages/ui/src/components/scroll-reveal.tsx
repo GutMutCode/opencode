@@ -127,7 +127,7 @@ export function ScrollReveal(props: ScrollRevealProps) {
         local.ref?.(el)
       }}
       fadeStartSize={8}
-      fadeEndSize={16}
+      fadeEndSize={8}
       direction="horizontal"
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
