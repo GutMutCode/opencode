@@ -232,31 +232,6 @@ describe("JSON to SQLite migration", () => {
     expect(stats?.sessions).toBe(0)
   })
 
-  test("creates sqlite-migrated marker file", async () => {
-    await migrateFromJson(sqlite, storageDir)
-
-    const marker = path.join(storageDir, "sqlite-migrated")
-    expect(await Bun.file(marker).exists()).toBe(true)
-  })
-
-  test("skips if already migrated", async () => {
-    await Bun.write(path.join(storageDir, "sqlite-migrated"), Date.now().toString())
-    await Bun.write(
-      path.join(storageDir, "project", "proj_test123abc.json"),
-      JSON.stringify({
-        id: "proj_test123abc",
-        worktree: "/",
-        time: { created: Date.now(), updated: Date.now() },
-        sandboxes: [],
-      }),
-    )
-
-    const stats = await migrateFromJson(sqlite, storageDir)
-
-    // Should return undefined (skipped) since already migrated
-    expect(stats).toBeUndefined()
-  })
-
   test("is idempotent (running twice doesn't duplicate)", async () => {
     await Bun.write(
       path.join(storageDir, "project", "proj_test123abc.json"),
@@ -269,10 +244,6 @@ describe("JSON to SQLite migration", () => {
     )
 
     await migrateFromJson(sqlite, storageDir)
-
-    // Remove marker to run again
-    await fs.rm(path.join(storageDir, "sqlite-migrated"))
-
     await migrateFromJson(sqlite, storageDir)
 
     const db = drizzle({ client: sqlite })
