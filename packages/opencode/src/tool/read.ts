@@ -60,8 +60,7 @@ export const ReadTool = Tool.define("read", {
       throw new Error(`File not found: ${filepath}`)
     }
 
-    const dir = path.dirname(filepath)
-    const instruction = await InstructionPrompt.resolve(ctx.messages, dir)
+    const instructions = await InstructionPrompt.resolve(ctx.messages, filepath)
 
     // Exclude SVG (XML-based) and vnd.fastbidsheet (.fbs extension, commonly FlatBuffers schema files)
     const isImage =
@@ -76,7 +75,7 @@ export const ReadTool = Tool.define("read", {
         metadata: {
           preview: msg,
           truncated: false,
-          ...(instruction && { loaded: instruction.filepath }),
+          ...(instructions.length > 0 && { loaded: instructions.map((i) => i.filepath) }),
         },
         attachments: [
           {
@@ -138,8 +137,8 @@ export const ReadTool = Tool.define("read", {
     LSP.touchFile(filepath, false)
     FileTime.read(ctx.sessionID, filepath)
 
-    if (instruction) {
-      output += `\n\n<system-reminder>\n${instruction.content}\n</system-reminder>`
+    if (instructions.length > 0) {
+      output += `\n\n<system-reminder>\n${instructions.map((i) => i.content).join("\n\n")}\n</system-reminder>`
     }
 
     return {
@@ -148,7 +147,7 @@ export const ReadTool = Tool.define("read", {
       metadata: {
         preview,
         truncated,
-        ...(instruction && { loaded: instruction.filepath }),
+        ...(instructions.length > 0 && { loaded: instructions.map((i) => i.filepath) }),
       },
     }
   },

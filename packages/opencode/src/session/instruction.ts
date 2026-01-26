@@ -119,8 +119,13 @@ export namespace InstructionPrompt {
       for (const part of msg.parts) {
         if (part.type === "tool" && part.tool === "read" && part.state.status === "completed") {
           if (part.state.time.compacted) continue
-          const filepath = part.state.metadata?.loaded
-          if (filepath) paths.add(filepath)
+          const loaded = part.state.metadata?.loaded
+          if (!loaded) continue
+          if (Array.isArray(loaded)) {
+            loaded.forEach((p) => paths.add(p))
+          } else {
+            paths.add(loaded)
+          }
         }
       }
     }
@@ -134,18 +139,28 @@ export namespace InstructionPrompt {
     }
   }
 
-  export async function resolve(messages: MessageV2.WithParts[], dir: string) {
-    const filepath = await find(dir)
-    if (!filepath) return undefined
+  export async function resolve(messages: MessageV2.WithParts[], filepath: string) {
+    const system = await systemPaths()
+    const already = loaded(messages)
+    const results: { filepath: string; content: string }[] = []
 
-    if ((await systemPaths()).has(filepath)) return undefined
-    if (loaded(messages).has(filepath)) return undefined
+    let current = path.dirname(path.resolve(filepath))
+    const root = path.resolve(Instance.directory)
 
-    const content = await Bun.file(filepath)
-      .text()
-      .catch(() => undefined)
-    if (!content) return undefined
+    while (current.startsWith(root)) {
+      const found = await find(current)
+      if (found && !system.has(found) && !already.has(found)) {
+        const content = await Bun.file(found)
+          .text()
+          .catch(() => undefined)
+        if (content) {
+          results.push({ filepath: found, content: "Instructions from: " + found + "\n" + content })
+        }
+      }
+      if (current === root) break
+      current = path.dirname(current)
+    }
 
-    return { filepath, content: "Instructions from: " + filepath + "\n" + content }
+    return results
   }
 }
