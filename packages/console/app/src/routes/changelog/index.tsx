@@ -6,7 +6,7 @@ import { Footer } from "~/component/footer"
 import { Legal } from "~/component/legal"
 import { config } from "~/config"
 import { For, Show, createSignal } from "solid-js"
-import { getRequestEvent } from "solid-js/web"
+import { changelog, type ChangelogRelease } from "~/lib/changelog"
 
 type HighlightMedia = { type: "video"; src: string } | { type: "image"; src: string; width: string; height: string }
 
@@ -20,26 +20,6 @@ type HighlightItem = {
 type HighlightGroup = {
   source: string
   items: HighlightItem[]
-}
-
-type ChangelogRelease = {
-  tag: string
-  name: string
-  date: string
-  url: string
-  highlights: HighlightGroup[]
-  sections: { title: string; items: string[] }[]
-}
-
-async function getReleases() {
-  const event = getRequestEvent()
-  const url = event ? new URL("/changelog.json", event.request.url).toString() : "/changelog.json"
-
-  const response = await fetch(url).catch(() => undefined)
-  if (!response?.ok) return []
-
-  const json = await response.json().catch(() => undefined)
-  return Array.isArray(json?.releases) ? (json.releases as ChangelogRelease[]) : []
 }
 
 function formatDate(dateString: string) {
@@ -130,7 +110,7 @@ function CollapsibleSections(props: { sections: { title: string; items: string[]
 }
 
 export default function Changelog() {
-  const releases = createAsync(() => getReleases())
+  const releases = createAsync(() => changelog())
 
   return (
     <main data-page="changelog">
