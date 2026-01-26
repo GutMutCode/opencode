@@ -25,6 +25,18 @@ await Bun.write(
 )
 console.log("Generated models-snapshot.ts")
 
+// Load migrations from journal
+const journal = (await Bun.file(path.join(dir, "migration/meta/_journal.json")).json()) as {
+  entries: { tag: string; when: number }[]
+}
+const migrations = await Promise.all(
+  journal.entries.map(async (entry) => {
+    const sql = await Bun.file(path.join(dir, `migration/${entry.tag}.sql`)).text()
+    return { sql, timestamp: entry.when }
+  }),
+)
+console.log(`Loaded ${migrations.length} migrations`)
+
 const singleFlag = process.argv.includes("--single")
 const baselineFlag = process.argv.includes("--baseline")
 const skipInstall = process.argv.includes("--skip-install")
@@ -156,6 +168,7 @@ for (const item of targets) {
     entrypoints: ["./src/index.ts", parserWorker, workerPath],
     define: {
       OPENCODE_VERSION: `'${Script.version}'`,
+      OPENCODE_MIGRATIONS: JSON.stringify(migrations),
       OTUI_TREE_SITTER_WORKER_PATH: bunfsRoot + workerRelativePath,
       OPENCODE_WORKER_PATH: workerPath,
       OPENCODE_CHANNEL: `'${Script.channel}'`,

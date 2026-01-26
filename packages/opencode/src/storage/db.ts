@@ -1,17 +1,19 @@
 import { Database as BunDatabase } from "bun:sqlite"
-import { drizzle, type BunSQLiteDatabase } from "drizzle-orm/bun-sqlite"
+import { drizzle, type SQLiteBunDatabase } from "drizzle-orm/bun-sqlite"
+import { migrate as drizzleMigrate } from "drizzle-orm/bun-sqlite/migrator"
 import type { SQLiteTransaction } from "drizzle-orm/sqlite-core"
-import type { ExtractTablesWithRelations } from "drizzle-orm"
 export * from "drizzle-orm"
 import { Context } from "../util/context"
 import { lazy } from "../util/lazy"
 import { Global } from "../global"
 import { Log } from "../util/log"
-import { migrations } from "./migrations.generated"
 import { migrateFromJson } from "./json-migration"
 import { NamedError } from "@opencode-ai/util/error"
 import z from "zod"
 import path from "path"
+import { readFileSync } from "fs"
+
+declare const OPENCODE_MIGRATIONS: { sql: string; timestamp: number }[] | undefined
 
 export const NotFoundError = NamedError.create(
   "NotFoundError",
@@ -23,20 +25,14 @@ export const NotFoundError = NamedError.create(
 const log = Log.create({ service: "db" })
 
 export namespace Database {
-  export type Transaction = SQLiteTransaction<
-    "sync",
-    void,
-    Record<string, never>,
-    ExtractTablesWithRelations<Record<string, never>>
-  >
+  export type Transaction = SQLiteTransaction<"sync", void, Record<string, never>, Record<string, never>>
 
-  type Client = BunSQLiteDatabase<Record<string, never>>
+  type Client = SQLiteBunDatabase
 
   const client = lazy(() => {
-    const dbPath = path.join(Global.Path.data, "opencode.db")
-    log.info("opening database", { path: dbPath })
+    log.info("opening database", { path: path.join(Global.Path.data, "opencode.db") })
 
-    const sqlite = new BunDatabase(dbPath, { create: true })
+    const sqlite = new BunDatabase(path.join(Global.Path.data, "opencode.db"), { create: true })
 
     sqlite.run("PRAGMA journal_mode = WAL")
     sqlite.run("PRAGMA synchronous = NORMAL")
@@ -44,11 +40,24 @@ export namespace Database {
     sqlite.run("PRAGMA cache_size = -64000")
     sqlite.run("PRAGMA foreign_keys = ON")
 
-    migrate(sqlite)
+    const db = drizzle({ client: sqlite })
+    migrate(db)
 
-    migrateFromJson(sqlite).catch((e) => log.error("json migration failed", { error: e }))
+    // Run json migration if not already done
+    const marker = sqlite.prepare("SELECT 1 FROM __drizzle_migrations WHERE hash = 'json-migration'").get()
+    if (!marker) {
+      Bun.file(path.join(Global.Path.data, "storage/project"))
+        .exists()
+        .then((exists) => {
+          if (!exists) return
+          return migrateFromJson(sqlite).then(() => {
+            sqlite.run("INSERT INTO __drizzle_migrations (hash, created_at) VALUES ('json-migration', ?)", [Date.now()])
+          })
+        })
+        .catch((e) => log.error("json migration failed", { error: e }))
+    }
 
-    return drizzle(sqlite)
+    return db
   })
 
   export type TxOrDb = Transaction | Client
@@ -100,41 +109,35 @@ export namespace Database {
   }
 }
 
-function migrate(sqlite: BunDatabase) {
-  sqlite.exec(`
-    CREATE TABLE IF NOT EXISTS _migrations (
-      name TEXT PRIMARY KEY,
-      applied_at INTEGER NOT NULL
-    )
-  `)
+type MigrationsJournal = { sql: string; timestamp: number }[]
 
-  const applied = new Set(
-    sqlite
-      .query<{ name: string }, []>("SELECT name FROM _migrations")
-      .all()
-      .map((r) => r.name),
-  )
+function prepareJournal(dir: string): MigrationsJournal {
+  const file = path.join(dir, "meta/_journal.json")
+  if (!Bun.file(file).size) return []
 
-  for (const migration of migrations) {
-    if (applied.has(migration.name)) continue
-    log.info("applying migration", { name: migration.name })
-
-    const statements = migration.sql.split("--> statement-breakpoint")
-    for (const stmt of statements) {
-      const trimmed = stmt.trim()
-      if (!trimmed) continue
-
-      try {
-        sqlite.exec(trimmed)
-      } catch (e: any) {
-        if (e?.message?.includes("already exists")) {
-          log.info("skipping existing object", { statement: trimmed.slice(0, 50) })
-          continue
-        }
-        throw e
-      }
-    }
-
-    sqlite.run("INSERT INTO _migrations (name, applied_at) VALUES (?, ?)", [migration.name, Date.now()])
+  const journal = JSON.parse(readFileSync(file, "utf-8")) as {
+    entries: { tag: string; when: number }[]
   }
+
+  return journal.entries.map((entry) => ({
+    sql: readFileSync(path.join(dir, `${entry.tag}.sql`), "utf-8"),
+    timestamp: entry.when,
+  }))
+}
+
+function migrate(db: SQLiteBunDatabase) {
+  const journal =
+    typeof OPENCODE_MIGRATIONS !== "undefined"
+      ? OPENCODE_MIGRATIONS
+      : prepareJournal(path.join(import.meta.dirname, "../../migration"))
+
+  if (journal.length === 0) {
+    log.info("no migrations found")
+    return
+  }
+  log.info("applying migrations", {
+    count: journal.length,
+    mode: typeof OPENCODE_MIGRATIONS !== "undefined" ? "bundled" : "dev",
+  })
+  drizzleMigrate(db, journal)
 }

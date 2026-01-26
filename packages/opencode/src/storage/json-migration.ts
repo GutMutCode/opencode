@@ -19,22 +19,10 @@ const log = Log.create({ service: "json-migration" })
 
 export async function migrateFromJson(sqlite: Database, customStorageDir?: string) {
   const storageDir = customStorageDir ?? path.join(Global.Path.data, "storage")
-  const migrationMarker = path.join(storageDir, "sqlite-migrated")
-
-  if (await Bun.file(migrationMarker).exists()) {
-    log.info("json migration already completed")
-    return
-  }
-
-  if (!(await Bun.file(path.join(storageDir, "migration")).exists())) {
-    log.info("no json storage found, skipping migration")
-    await Bun.write(migrationMarker, Date.now().toString())
-    return
-  }
 
   log.info("starting json to sqlite migration", { storageDir })
 
-  const db = drizzle(sqlite)
+  const db = drizzle({ client: sqlite })
   const stats = {
     projects: 0,
     sessions: 0,
@@ -276,9 +264,6 @@ export async function migrateFromJson(sqlite: Database, customStorageDir?: strin
       stats.errors.push(`failed to migrate share ${file}: ${e}`)
     }
   }
-
-  // Mark migration complete
-  await Bun.write(migrationMarker, Date.now().toString())
 
   log.info("json migration complete", {
     projects: stats.projects,

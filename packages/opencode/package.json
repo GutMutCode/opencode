@@ -15,7 +15,8 @@
     "lint": "echo 'Running lint checks...' && bun test --coverage",
     "format": "echo 'Formatting code...' && bun run --prettier --write src/**/*.ts",
     "docs": "echo 'Generating documentation...' && find src -name '*.ts' -exec echo 'Processing: {}' \\;",
-    "deploy": "echo 'Deploying application...' && bun run build && echo 'Deployment completed successfully'"
+    "deploy": "echo 'Deploying application...' && bun run build && echo 'Deployment completed successfully'",
+    "db": "bun drizzle-kit"
   },
   "bin": {
     "opencode": "./bin/opencode"
@@ -25,7 +26,7 @@
   },
   "devDependencies": {
     "@babel/core": "7.28.4",
-    "drizzle-kit": "0.31.0",
+    "drizzle-kit": "1.0.0-beta.12-a5629fb",
     "@octokit/webhooks-types": "7.6.1",
     "@opencode-ai/script": "workspace:*",
     "@parcel/watcher-darwin-arm64": "2.5.1",
@@ -98,7 +99,7 @@
     "clipboardy": "4.0.0",
     "decimal.js": "10.5.0",
     "diff": "catalog:",
-    "drizzle-orm": "0.44.2",
+    "drizzle-orm": "1.0.0-beta.12-a5629fb",
     "fuzzysort": "3.1.0",
     "gray-matter": "4.0.3",
     "hono": "catalog:",

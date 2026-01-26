@@ -1,9 +1,11 @@
 import { describe, test, expect, beforeEach, afterEach } from "bun:test"
 import { Database } from "bun:sqlite"
 import { drizzle } from "drizzle-orm/bun-sqlite"
+import { migrate } from "drizzle-orm/bun-sqlite/migrator"
 import { eq } from "drizzle-orm"
 import path from "path"
 import fs from "fs/promises"
+import { readFileSync } from "fs"
 import os from "os"
 import { migrateFromJson } from "../../src/storage/json-migration"
 import { ProjectTable } from "../../src/project/project.sql"
@@ -17,7 +19,6 @@ import {
   PermissionTable,
 } from "../../src/session/session.sql"
 import { SessionShareTable, ShareTable } from "../../src/share/share.sql"
-import { migrations } from "../../src/storage/migrations.generated"
 
 // Test fixtures
 const fixtures = {
@@ -76,14 +77,16 @@ function createTestDb() {
   const sqlite = new Database(":memory:")
   sqlite.exec("PRAGMA foreign_keys = ON")
 
-  // Apply schema migrations
-  for (const migration of migrations) {
-    const statements = migration.sql.split("--> statement-breakpoint")
-    for (const stmt of statements) {
-      const trimmed = stmt.trim()
-      if (trimmed) sqlite.exec(trimmed)
-    }
+  // Apply schema migrations using drizzle migrate
+  const dir = path.join(import.meta.dirname, "../../migration")
+  const journal = JSON.parse(readFileSync(path.join(dir, "meta/_journal.json"), "utf-8")) as {
+    entries: { tag: string; when: number }[]
   }
+  const migrations = journal.entries.map((entry) => ({
+    sql: readFileSync(path.join(dir, `${entry.tag}.sql`), "utf-8"),
+    timestamp: entry.when,
+  }))
+  migrate(drizzle({ client: sqlite }), migrations)
 
   return sqlite
 }
@@ -122,7 +125,7 @@ describe("JSON to SQLite migration", () => {
 
     expect(stats?.projects).toBe(1)
 
-    const db = drizzle(sqlite)
+    const db = drizzle({ client: sqlite })
     const projects = db.select().from(ProjectTable).all()
     expect(projects.length).toBe(1)
     expect(projects[0].id).toBe("proj_test123abc")
@@ -160,7 +163,7 @@ describe("JSON to SQLite migration", () => {
 
     await migrateFromJson(sqlite, storageDir)
 
-    const db = drizzle(sqlite)
+    const db = drizzle({ client: sqlite })
     const sessions = db.select().from(SessionTable).all()
     expect(sessions.length).toBe(1)
     expect(sessions[0].id).toBe("ses_test456def")
@@ -200,7 +203,7 @@ describe("JSON to SQLite migration", () => {
     expect(stats?.messages).toBe(1)
     expect(stats?.parts).toBe(1)
 
-    const db = drizzle(sqlite)
+    const db = drizzle({ client: sqlite })
     const messages = db.select().from(MessageTable).all()
     expect(messages.length).toBe(1)
     expect(messages[0].data.id).toBe("msg_test789ghi")
@@ -272,7 +275,7 @@ describe("JSON to SQLite migration", () => {
 
     await migrateFromJson(sqlite, storageDir)
 
-    const db = drizzle(sqlite)
+    const db = drizzle({ client: sqlite })
     const projects = db.select().from(ProjectTable).all()
     expect(projects.length).toBe(1) // Still only 1 due to onConflictDoNothing
   })

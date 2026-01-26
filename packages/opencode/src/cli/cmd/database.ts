@@ -129,9 +129,6 @@ const ExportCommand = cmd({
         stats.shares++
       }
 
-      // Create migration marker so this can be imported back
-      await Bun.write(path.join(outDir, "migration"), Date.now().toString())
-
       UI.println(`Exported to ${outDir}:`)
       UI.println(`  ${stats.projects} projects`)
       UI.println(`  ${stats.sessions} sessions`)
