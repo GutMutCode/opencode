@@ -37,7 +37,7 @@ jobs:
         working-directory: packages/opencode
 
       - name: Build
-        run: bun run build
+        run: bun run build --single
         working-directory: packages/opencode
 
       - name: Package (Unix)
