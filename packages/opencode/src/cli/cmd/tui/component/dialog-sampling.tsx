@@ -133,9 +133,14 @@ export function useSamplingApprovalHandler() {
   onMount(() => {
     debugLog("onMount - subscribing via sdk.event.on")
     
-    const unsub = sdk.event.on(TuiEvent.SamplingApprovalRequested.type, async (event) => {
+    const unsub = sdk.event.on(TuiEvent.SamplingApprovalRequested.type as any, async (event: any) => {
       debugLog(`*** APPROVAL EVENT RECEIVED *** serverName=${event.properties.serverName}`)
-      const { serverName, requestId, messages, maxTokens } = event.properties
+      const { serverName, requestId, messages, maxTokens } = event.properties as {
+        serverName: string
+        requestId: string
+        messages: any[]
+        maxTokens?: number
+      }
       
       debugLog("Showing dialog...")
       const approved = await DialogSampling.show(
