@@ -3,6 +3,7 @@ import { describeRoute, validator, resolver } from "hono-openapi"
 import z from "zod"
 import { Bus } from "../../bus"
 import { Session } from "../../session"
+import { Sampling } from "../../mcp/sampling"
 import { TuiEvent } from "@/cli/cmd/tui/event"
 import { AsyncQueue } from "../../util/queue"
 import { errors } from "../error"
@@ -372,6 +373,30 @@ export const TuiRoutes = lazy(() =>
         const { sessionID } = c.req.valid("json")
         await Session.get(sessionID)
         await Bus.publish(TuiEvent.SessionSelect, { sessionID })
+        return c.json(true)
+      },
+    )
+    .post(
+      "/current-session",
+      describeRoute({
+        summary: "Update current TUI session",
+        description: "Report the currently active session in the TUI.",
+        operationId: "tui.currentSession",
+        responses: {
+          200: {
+            description: "Current session updated",
+            content: {
+              "application/json": {
+                schema: resolver(z.boolean()),
+              },
+            },
+          },
+        },
+      }),
+      validator("json", z.object({ sessionID: z.string().nullable() })),
+      async (c) => {
+        const { sessionID } = c.req.valid("json")
+        Sampling.setCurrentTuiSession(sessionID)
         return c.json(true)
       },
     )
