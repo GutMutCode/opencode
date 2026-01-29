@@ -980,7 +980,9 @@ export namespace Provider {
 
       const customFetch = options["fetch"]
 
-      const key = Bun.hash.xxHash32(JSON.stringify({ npm: model.api.npm, options, hasCustomFetch: !!customFetch }))
+      const key = Bun.hash.xxHash32(
+        JSON.stringify({ providerID: model.providerID, npm: model.api.npm, options, hasCustomFetch: !!customFetch }),
+      )
       // Don't use cache if custom fetch exists - the closure might have stale reference
       if (!customFetch) {
         const existing = s.sdk.get(key)
@@ -991,7 +993,7 @@ export namespace Provider {
         if (customFetch) {
           return customFetch(input, init)
         }
-        
+
         const fetchFn = fetch
         const opts = init ?? {}
 
