@@ -1,11 +1,17 @@
 name: Release Fork
 
 on:
+  push:
+    branches:
+      - dev
+    paths:
+      - "packages/opencode/**"
+      - ".github/workflows/release-fork.yml"
   workflow_dispatch:
     inputs:
       version:
-        description: "Version (e.g., 0.1.0)"
-        required: true
+        description: "Version override (optional, e.g., 1.0.0)"
+        required: false
         type: string
 
 permissions:
@@ -62,6 +68,20 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate version
+        id: version
+        run: |
+          if [ -n "${{ inputs.version }}" ]; then
+            echo "version=${{ inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            # Auto-generate version: YYYY.MM.DD-SHORT_SHA
+            DATE=$(date +'%Y.%m.%d')
+            SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
+            echo "version=${DATE}-${SHORT_SHA}" >> $GITHUB_OUTPUT
+          fi
+
       - uses: actions/download-artifact@v4
         with:
           path: artifacts
@@ -70,10 +90,11 @@ jobs:
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ inputs.version }}
-          name: v${{ inputs.version }}
+          tag_name: v${{ steps.version.outputs.version }}
+          name: v${{ steps.version.outputs.version }}
           files: |
             artifacts/*.tar.gz
             artifacts/*.zip
           draft: false
           prerelease: false
+          generate_release_notes: true
