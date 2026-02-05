@@ -249,7 +249,7 @@ export namespace Config {
 
   export async function installDependencies(dir: string) {
     const pkg = path.join(dir, "package.json")
-    const targetVersion = Installation.isLocal() ? "*" : Installation.VERSION
+    const targetVersion = Installation.isLocal() || Installation.isPreview() ? "*" : Installation.VERSION
 
     const json = await Bun.file(pkg)
       .json()
@@ -308,7 +308,7 @@ export namespace Config {
     const depVersion = dependencies["@opencode-ai/plugin"]
     if (!depVersion) return true
 
-    const targetVersion = Installation.isLocal() ? "latest" : Installation.VERSION
+    const targetVersion = Installation.isLocal() || Installation.isPreview() ? "latest" : Installation.VERSION
     if (targetVersion === "latest") {
       const isOutdated = await PackageRegistry.isOutdated("@opencode-ai/plugin", depVersion, dir)
       if (!isOutdated) return false
@@ -590,11 +590,15 @@ export namespace Config {
     .object({
       mode: SamplingTrustLevel.optional()
         .default("prompt")
-        .describe("Trust level for sampling requests: 'auto' approves automatically, 'prompt' asks user, 'deny' rejects"),
+        .describe(
+          "Trust level for sampling requests: 'auto' approves automatically, 'prompt' asks user, 'deny' rejects",
+        ),
       model: z
         .string()
         .optional()
-        .describe("Model to use for sampling requests (e.g., 'google/antigravity-claude-sonnet-4-5'). Defaults to the default model."),
+        .describe(
+          "Model to use for sampling requests (e.g., 'google/antigravity-claude-sonnet-4-5'). Defaults to the default model.",
+        ),
       maxTokens: z
         .number()
         .int()
