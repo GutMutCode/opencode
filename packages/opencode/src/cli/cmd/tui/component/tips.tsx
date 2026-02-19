@@ -149,4 +149,5 @@ const TIPS = [
   "Run {highlight}/help{/highlight} or {highlight}Ctrl+X H{/highlight} to show the help dialog",
   "Use {highlight}/rename{/highlight} to rename the current session",
   "Press {highlight}Ctrl+Z{/highlight} to suspend the terminal and return to your shell",
+  "Use {highlight}Playwriter{/highlight} MCP for browser automation with your existing Chrome — see {highlight}https://github.com/remorses/playwriter{/highlight}",
 ]
