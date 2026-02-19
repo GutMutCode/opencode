@@ -8,6 +8,7 @@ import {
   CallToolResultSchema,
   type Tool as MCPToolDef,
   ToolListChangedNotificationSchema,
+  CreateMessageRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js"
 import { Config } from "../config/config"
 import { Log } from "../util/log"
@@ -113,6 +114,18 @@ export namespace MCP {
     client.setNotificationHandler(ToolListChangedNotificationSchema, async () => {
       log.info("tools list changed notification received", { server: serverName })
       Bus.publish(ToolsChanged, { server: serverName })
+    })
+  }
+
+  // Register sampling request handler for MCP client
+  // This allows MCP servers to request LLM completions from the client
+  function registerSamplingHandler(client: MCPClient, serverName: string) {
+    client.setRequestHandler(CreateMessageRequestSchema, async (request) => {
+      log.info("sampling request received", { server: serverName, maxTokens: request.params.maxTokens })
+
+      // Import dynamically to avoid circular dependencies
+      const { Sampling } = await import("./sampling")
+      return Sampling.handleCreateMessage(serverName, request.params)
     })
   }
 
@@ -346,12 +359,20 @@ export namespace MCP {
       const connectTimeout = mcp.timeout ?? DEFAULT_TIMEOUT
       for (const { name, transport } of transports) {
         try {
-          const client = new Client({
-            name: "opencode",
-            version: Installation.VERSION,
-          })
+          const client = new Client(
+            {
+              name: "opencode",
+              version: Installation.VERSION,
+            },
+            {
+              capabilities: {
+                sampling: {},
+              },
+            },
+          )
           await withTimeout(client.connect(transport), connectTimeout)
           registerNotificationHandlers(client, key)
+          registerSamplingHandler(client, key)
           mcpClient = client
           log.info("connected", { key, transport: name })
           status = { status: "connected" }
@@ -425,12 +446,20 @@ export namespace MCP {
 
       const connectTimeout = mcp.timeout ?? DEFAULT_TIMEOUT
       try {
-        const client = new Client({
-          name: "opencode",
-          version: Installation.VERSION,
-        })
+        const client = new Client(
+          {
+            name: "opencode",
+            version: Installation.VERSION,
+          },
+          {
+            capabilities: {
+              sampling: {},
+            },
+          },
+        )
         await withTimeout(client.connect(transport), connectTimeout)
         registerNotificationHandlers(client, key)
+        registerSamplingHandler(client, key)
         mcpClient = client
         status = {
           status: "connected",

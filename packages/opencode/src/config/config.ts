@@ -597,6 +597,39 @@ export namespace Config {
   export const Mcp = z.discriminatedUnion("type", [McpLocal, McpRemote])
   export type Mcp = z.infer<typeof Mcp>
 
+  export const SamplingTrustLevel = z.enum(["auto", "prompt", "deny"]).meta({
+    ref: "SamplingTrustLevelConfig",
+  })
+  export type SamplingTrustLevel = z.infer<typeof SamplingTrustLevel>
+
+  export const SamplingConfig = z
+    .object({
+      mode: SamplingTrustLevel.optional()
+        .default("prompt")
+        .describe("Trust level for sampling requests: 'auto' approves automatically, 'prompt' asks user, 'deny' rejects"),
+      model: z
+        .string()
+        .optional()
+        .describe("Model to use for sampling requests (e.g., 'google/antigravity-claude-sonnet-4-5'). Defaults to the default model."),
+      maxTokens: z
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe("Maximum tokens per sampling request. Defaults to model's limit if not specified."),
+      dailyLimit: z
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe("Maximum number of sampling requests per day per server"),
+    })
+    .strict()
+    .meta({
+      ref: "SamplingConfig",
+    })
+  export type SamplingConfig = z.infer<typeof SamplingConfig>
+
   export const PermissionAction = z.enum(["ask", "allow", "deny"]).meta({
     ref: "PermissionActionConfig",
   })
@@ -1112,6 +1145,10 @@ export namespace Config {
         )
         .optional()
         .describe("MCP (Model Context Protocol) server configurations"),
+      sampling: z
+        .record(z.string(), SamplingConfig)
+        .optional()
+        .describe("Sampling configuration per MCP server. Key is server name, value is trust settings."),
       formatter: z
         .union([
           z.literal(false),
