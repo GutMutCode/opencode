@@ -20,6 +20,7 @@ import { DialogHelp } from "./ui/dialog-help"
 import { CommandProvider, useCommandDialog } from "@tui/component/dialog-command"
 import { DialogAgent } from "@tui/component/dialog-agent"
 import { DialogSessionList } from "@tui/component/dialog-session-list"
+import { useSamplingApprovalHandler } from "@tui/component/dialog-sampling"
 import { KeybindProvider } from "@tui/context/keybind"
 import { ThemeProvider, useTheme } from "@tui/context/theme"
 import { Home } from "@tui/routes/home"
@@ -256,6 +257,15 @@ function App() {
     console.log(JSON.stringify(route.data))
   })
 
+  createEffect(() => {
+    const sessionID = route.data.type === "session" ? route.data.sessionID : null
+    sdk.fetch(new URL("/tui/current-session", sdk.url).toString(), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sessionID }),
+    }).catch(() => {})
+  })
+
   // Update terminal window title based on current route and session
   createEffect(() => {
     if (!terminalTitleEnabled() || Flag.OPENCODE_DISABLE_TERMINAL_TITLE) return
@@ -279,6 +289,9 @@ function App() {
   })
 
   const args = useArgs()
+
+  useSamplingApprovalHandler()
+
   onMount(() => {
     batch(() => {
       if (args.agent) local.agent.set(args.agent)
