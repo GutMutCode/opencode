@@ -913,7 +913,8 @@ export namespace Provider {
       }
     }
 
-    for (const plugin of await Plugin.list()) {
+    const pluginList = await Plugin.list()
+    for (const plugin of pluginList) {
       if (!plugin.auth) continue
       const providerID = plugin.auth.provider
       if (disabled.has(providerID)) continue
@@ -1064,15 +1065,21 @@ export namespace Provider {
           ...model.headers,
         }
 
-      const key = Bun.hash.xxHash32(JSON.stringify({ providerID: model.providerID, npm: model.api.npm, options }))
-      const existing = s.sdk.get(key)
-      if (existing) return existing
-
       const customFetch = options["fetch"]
 
+      const key = Bun.hash.xxHash32(JSON.stringify({ npm: model.api.npm, options, hasCustomFetch: !!customFetch }))
+      // Don't use cache if custom fetch exists - the closure might have stale reference
+      if (!customFetch) {
+        const existing = s.sdk.get(key)
+        if (existing) return existing
+      }
+
       options["fetch"] = async (input: any, init?: BunFetchRequestInit) => {
-        // Preserve custom fetch if it exists, wrap it with timeout logic
-        const fetchFn = customFetch ?? fetch
+        if (customFetch) {
+          return customFetch(input, init)
+        }
+
+        const fetchFn = fetch
         const opts = init ?? {}
 
         if (options["timeout"] !== undefined && options["timeout"] !== null) {
@@ -1170,9 +1177,9 @@ export namespace Provider {
   export async function getLanguage(model: Model): Promise<LanguageModelV2> {
     const s = await state()
     const key = `${model.providerID}/${model.id}`
+    const provider = s.providers[model.providerID]
     if (s.models.has(key)) return s.models.get(key)!
 
-    const provider = s.providers[model.providerID]
     const sdk = await getSDK(model)
 
     try {
