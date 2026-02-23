@@ -47,6 +47,7 @@ jobs:
           OPENCODE_RELEASE: ${{ github.run_id }}
           OPENCODE_CHANNEL: latest
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
 
       - name: Publish release
         run: gh release edit ${{ steps.version.outputs.tag }} --draft=false
