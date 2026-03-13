@@ -21,6 +21,7 @@ import { CommandProvider, useCommandDialog } from "@tui/component/dialog-command
 import { DialogAgent } from "@tui/component/dialog-agent"
 import { DialogSessionList } from "@tui/component/dialog-session-list"
 import { useSamplingApprovalHandler } from "@tui/component/dialog-sampling"
+import { DialogWorkspaceList } from "@tui/component/dialog-workspace-list"
 import { KeybindProvider } from "@tui/context/keybind"
 import { ThemeProvider, useTheme } from "@tui/context/theme"
 import { Home } from "@tui/routes/home"
@@ -39,6 +40,8 @@ import { ArgsProvider, useArgs, type Args } from "./context/args"
 import open from "open"
 import { writeHeapSnapshot } from "v8"
 import { PromptRefProvider, usePromptRef } from "./context/prompt"
+import { TuiConfigProvider } from "./context/tui-config"
+import { TuiConfig } from "@/config/tui"
 
 async function getTerminalBackgroundColor(): Promise<"dark" | "light"> {
   // can't set raw mode if not a TTY
@@ -105,11 +108,11 @@ import type { EventSource } from "./context/sdk"
 export function tui(input: {
   url: string
   args: Args
+  config: TuiConfig.Info
   directory?: string
   fetch?: typeof fetch
   headers?: RequestInit["headers"]
   events?: EventSource
-  onExit?: () => Promise<void>
 }) {
   // promise to prevent immediate exit
   return new Promise<void>(async (resolve) => {
@@ -124,7 +127,6 @@ export function tui(input: {
 
     const onExit = async () => {
       unguard?.()
-      await input.onExit?.()
       resolve()
     }
 
@@ -139,35 +141,37 @@ export function tui(input: {
                 <KVProvider>
                   <ToastProvider>
                     <RouteProvider>
-                      <SDKProvider
-                        url={input.url}
-                        directory={input.directory}
-                        fetch={input.fetch}
-                        headers={input.headers}
-                        events={input.events}
-                      >
-                        <SyncProvider>
-                          <ThemeProvider mode={mode}>
-                            <LocalProvider>
-                              <KeybindProvider>
-                                <PromptStashProvider>
-                                  <DialogProvider>
-                                    <CommandProvider>
-                                      <FrecencyProvider>
-                                        <PromptHistoryProvider>
-                                          <PromptRefProvider>
-                                            <App />
-                                          </PromptRefProvider>
-                                        </PromptHistoryProvider>
-                                      </FrecencyProvider>
-                                    </CommandProvider>
-                                  </DialogProvider>
-                                </PromptStashProvider>
-                              </KeybindProvider>
-                            </LocalProvider>
-                          </ThemeProvider>
-                        </SyncProvider>
-                      </SDKProvider>
+                      <TuiConfigProvider config={input.config}>
+                        <SDKProvider
+                          url={input.url}
+                          directory={input.directory}
+                          fetch={input.fetch}
+                          headers={input.headers}
+                          events={input.events}
+                        >
+                          <SyncProvider>
+                            <ThemeProvider mode={mode}>
+                              <LocalProvider>
+                                <KeybindProvider>
+                                  <PromptStashProvider>
+                                    <DialogProvider>
+                                      <CommandProvider>
+                                        <FrecencyProvider>
+                                          <PromptHistoryProvider>
+                                            <PromptRefProvider>
+                                              <App />
+                                            </PromptRefProvider>
+                                          </PromptHistoryProvider>
+                                        </FrecencyProvider>
+                                      </CommandProvider>
+                                    </DialogProvider>
+                                  </PromptStashProvider>
+                                </KeybindProvider>
+                              </LocalProvider>
+                            </ThemeProvider>
+                          </SyncProvider>
+                        </SDKProvider>
+                      </TuiConfigProvider>
                     </RouteProvider>
                   </ToastProvider>
                 </KVProvider>
@@ -259,11 +263,13 @@ function App() {
 
   createEffect(() => {
     const sessionID = route.data.type === "session" ? route.data.sessionID : null
-    sdk.fetch(new URL("/tui/current-session", sdk.url).toString(), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ sessionID }),
-    }).catch(() => {})
+    sdk
+      .fetch(new URL("/tui/current-session", sdk.url).toString(), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionID }),
+      })
+      .catch(() => {})
   })
 
   // Update terminal window title based on current route and session
@@ -381,6 +387,22 @@ function App() {
         dialog.replace(() => <DialogSessionList />)
       },
     },
+    ...(Flag.OPENCODE_EXPERIMENTAL_WORKSPACES
+      ? [
+          {
+            title: "Manage workspaces",
+            value: "workspace.list",
+            category: "Workspace",
+            suggested: true,
+            slash: {
+              name: "workspaces",
+            },
+            onSelect: () => {
+              dialog.replace(() => <DialogWorkspaceList />)
+            },
+          },
+        ]
+      : []),
     {
       title: "New session",
       suggested: route.data.type === "session",
@@ -395,9 +417,12 @@ function App() {
         const current = promptRef.current
         // Don't require focus - if there's any text, preserve it
         const currentPrompt = current?.current?.input ? current.current : undefined
+        const workspaceID =
+          route.data.type === "session" ? sync.session.get(route.data.sessionID)?.workspaceID : undefined
         route.navigate({
           type: "home",
           initialPrompt: currentPrompt,
+          workspaceID,
         })
         dialog.clear()
       },
@@ -666,20 +691,6 @@ function App() {
       },
     },
   ])
-
-  createEffect(() => {
-    const currentModel = local.model.current()
-    if (!currentModel) return
-    if (currentModel.providerID === "openrouter" && !kv.get("openrouter_warning", false)) {
-      untrack(() => {
-        DialogAlert.show(
-          dialog,
-          "Warning",
-          "While openrouter is a convenient way to access LLMs your request will often be routed to subpar providers that do not work well in our testing.\n\nFor reliable access to models check out OpenCode Zen\nhttps://opencode.ai/zen",
-        ).then(() => kv.set("openrouter_warning", true))
-      })
-    }
-  })
 
   sdk.event.on(TuiEvent.CommandExecute.type, (evt) => {
     command.trigger(evt.properties.command)
