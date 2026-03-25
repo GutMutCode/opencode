@@ -5,6 +5,7 @@ import { Bus } from "@/bus"
 import { BusEvent } from "@/bus/bus-event"
 import { TuiEvent } from "@/cli/cmd/tui/event"
 import { Session } from "@/session"
+import { SessionID } from "@/session/schema"
 import { SessionPrompt } from "@/session/prompt"
 import z from "zod/v4"
 
@@ -16,7 +17,12 @@ export namespace Sampling {
     z.object({
       serverName: z.string(),
       requestId: z.string(),
-      messages: z.array(z.any()),
+      messages: z.array(
+        z.object({
+          role: z.string(),
+          content: z.unknown(),
+        }),
+      ),
       maxTokens: z.number().optional(),
     }),
   )
@@ -37,15 +43,15 @@ export namespace Sampling {
     }
   >()
 
-  const serverSessions = new Map<string, string>()
+  const serverSessions = new Map<string, z.infer<typeof SessionID.zod>>()
 
-  let currentTuiSessionID: string | null = null
+  let currentTuiSessionID: z.infer<typeof SessionID.zod> | null = null
 
   export function setCurrentTuiSession(sessionID: string | null) {
-    currentTuiSessionID = sessionID
+    currentTuiSessionID = sessionID ? SessionID.zod.parse(sessionID) : null
   }
 
-  export function getCurrentTuiSession(): string | null {
+  export function getCurrentTuiSession(): z.infer<typeof SessionID.zod> | null {
     return currentTuiSessionID
   }
 
@@ -82,7 +88,10 @@ export namespace Sampling {
     }
 
     if (samplingConfig.maxTokens && params.maxTokens && params.maxTokens > samplingConfig.maxTokens) {
-      return { allowed: false, reason: `Requested tokens (${params.maxTokens}) exceeds limit (${samplingConfig.maxTokens})` }
+      return {
+        allowed: false,
+        reason: `Requested tokens (${params.maxTokens}) exceeds limit (${samplingConfig.maxTokens})`,
+      }
     }
 
     if (mode === "auto") {

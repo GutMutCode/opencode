@@ -10,7 +10,12 @@ export const TuiEvent = {
     z.object({
       serverName: z.string(),
       requestId: z.string(),
-      messages: z.array(z.any()),
+      messages: z.array(
+        z.object({
+          role: z.string(),
+          content: z.unknown(),
+        }),
+      ),
       maxTokens: z.number().optional(),
     }),
   ),
